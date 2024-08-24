@@ -1,2 +1,5 @@
-# moneybotsapi-v2
-Moneybots API
+# Moneybots API
+
+API for Moneybots Project
+
+## ToDo
