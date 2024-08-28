@@ -32,7 +32,7 @@ func (r *Repository) TruncateTickerInstruments() error {
 // UpsertQueriedInstruments upserts instruments queried from the instrument table
 //
 //	used by cron job to keep ticker instruments updated
-func (r *Repository) UpsertQueriedInstruments(exchange, tradingsymbol, expiry, strike string) (map[string]interface{}, error) {
+func (r *Repository) UpsertQueriedInstruments(exchange, tradingsymbol, expiry, strike, segment string) (map[string]interface{}, error) {
 	query := r.DB.Model(&instrument.InstrumentModel{})
 
 	if exchange != "" {
@@ -50,6 +50,10 @@ func (r *Repository) UpsertQueriedInstruments(exchange, tradingsymbol, expiry, s
 			return nil, err
 		}
 		query = query.Where("strike = ?", strikeFloat)
+	}
+
+	if segment != "" {
+		query = query.Where("segment LIKE ?", segment)
 	}
 
 	var instruments []instrument.InstrumentModel

@@ -233,20 +233,20 @@ func (cs *CronService) tickerInstrumentsUpdateJob() {
 	zaplogger.Info("TickerInstruments truncate successful")
 	zaplogger.Info("")
 
-	// m0NFO, _, _ := cs.tickerService.GetNFOFilterMonths()
-	// m0NFOFutFilter := "%" + m0NFO + "FUT"
-	// m0NFONiftyOptFilter := "NIFTY" + m0NFO + "%00_E"
-	// m0NFOBankNiftyOptFilter := "BANKNIFTY" + m0NFO + "%00_E"
+	m0NFO, _, _ := cs.tickerService.GetNFOFilterMonths()
+	m0NFOFutFilter := "%" + m0NFO + "FUT"
+	m0NFONiftyOptFilter := "NIFTY" + m0NFO + "%00_E"
+	m0NFOBankNiftyOptFilter := "BANKNIFTY" + m0NFO + "%00_E"
 
-	// _, m1NFO, _ := cs.tickerService.GetNFOFilterMonths()
-	// m1NFOFutFilter := "%" + m1NFO + "FUT"
-	// m1NFONiftyOptFilter := "NIFTY" + m1NFO + "%00_E"
-	// m1NFOBankNiftyOptFilter := "BANKNIFTY" + m1NFO + "%00_E"
+	_, m1NFO, _ := cs.tickerService.GetNFOFilterMonths()
+	m1NFOFutFilter := "%" + m1NFO + "FUT"
+	m1NFONiftyOptFilter := "NIFTY" + m1NFO + "%00_E"
+	m1NFOBankNiftyOptFilter := "BANKNIFTY" + m1NFO + "%00_E"
 
-	// _, _, m2NFO := cs.tickerService.GetNFOFilterMonths()
-	// m2NFOFutFilter := "%" + m2NFO + "FUT"
-	// m2NFONiftyOptFilter := "NIFTY" + m2NFO + "%00_E"
-	// m2NFOBankNiftyOptFilter := "BANKNIFTY" + m2NFO + "%00_E"
+	_, _, m2NFO := cs.tickerService.GetNFOFilterMonths()
+	m2NFOFutFilter := "%" + m2NFO + "FUT"
+	m2NFONiftyOptFilter := "NIFTY" + m2NFO + "%00_E"
+	m2NFOBankNiftyOptFilter := "BANKNIFTY" + m2NFO + "%00_E"
 
 	// Define instrument queries
 	queries := []struct {
@@ -254,33 +254,35 @@ func (cs *CronService) tickerInstrumentsUpdateJob() {
 		tradingsymbol string
 		expiry        string
 		strike        string
+		segment       string
 		description   string
 	}{
-		{"NSE", "INDIA VIX", "", "", "NSE:INDIA VIX"},                        // NSE:INDIA VIX
-		{"NSE", "NIFTY 50", "", "", "NSE:NIFTY 50"},                          // NSE:NIFTY 50 - ~1
-		{"NFO", "%FUT", "", "", "NFO All Futures"},                           // NFO All Futures - ~120
-		{"NFO", "NIFTY%", "", "", "NFO NIFTY All Futures & Options"},         // NFO NIFTY All Futures & Options - ~2720
-		{"NFO", "BANKNIFTY%", "", "", "NFO BANKNIFTY All Futures & Options"}, // NFO BANKNIFTY All Futures & Options - ~1520
-		{"NFO", "FINNIFTY%", "", "", "NFO FINNIFTY All Futures & Options"},   // NFO FINNIFTY All Futures & Options - ~1160
-		{"MCX", "%FUT", "", "", "MCX All Futures"},                           // MCX All Futures - ~550
+		{"NSE", "INDIA VIX", "", "", "", "NSE:INDIA VIX"}, // NSE:INDIA VIX
+		{"NSE", "", "", "", "INDICES", "NSE:INDICES"},     // NSE:INDICES - ~78
+		{"MCX", "", "", "", "INDICES", "MCX:INDICES"},     // MCX:INDICES - ~10
+		{"NFO", "%FUT", "", "", "", "NFO All Futures"},    // NFO All Futures - ~120
+		{"MCX", "%FUT", "", "", "", "MCX All Futures"},    // MCX All Futures - ~550
+		// {"NFO", "NIFTY%", "", "", "", "NFO NIFTY All Futures & Options"},         // NFO NIFTY All Futures & Options - ~2720
+		// {"NFO", "BANKNIFTY%", "", "", "", "NFO BANKNIFTY All Futures & Options"}, // NFO BANKNIFTY All Futures & Options - ~1520
+		// {"NFO", "FINNIFTY%", "", "", "", "NFO FINNIFTY All Futures & Options"},   // NFO FINNIFTY All Futures & Options - ~1160
 
 		// NIFTY and BANKNIFTY Options for the next 3 months
-		// {"NFO", m0NFOFutFilter, "", "", "NFO ALL FUT - m0 [" + m0NFO + "]"},
-		// {"NFO", m0NFONiftyOptFilter, "", "", "NFO NIFTY OPT - m0 [" + m0NFO + "]"},
-		// {"NFO", m0NFOBankNiftyOptFilter, "", "", "NFO BANKNIFTY OPT - m0 [" + m0NFO + "]"},
+		{"NFO", m0NFOFutFilter, "", "", "", "NFO ALL FUT - m0 [" + m0NFO + "]"},
+		{"NFO", m0NFONiftyOptFilter, "", "", "", "NFO NIFTY OPT - m0 [" + m0NFO + "]"},
+		{"NFO", m0NFOBankNiftyOptFilter, "", "", "", "NFO BANKNIFTY OPT - m0 [" + m0NFO + "]"},
 
-		// {"NFO", m1NFOFutFilter, "", "", "NFO ALL FUT - m1 [" + m1NFO + "]"},
-		// {"NFO", m1NFONiftyOptFilter, "", "", "NFO NIFTY OPT - m1 [" + m1NFO + "]"},
-		// {"NFO", m1NFOBankNiftyOptFilter, "", "", "NFO BANKNIFTY OPT - m1 [" + m1NFO + "]"},
+		{"NFO", m1NFOFutFilter, "", "", "", "NFO ALL FUT - m1 [" + m1NFO + "]"},
+		{"NFO", m1NFONiftyOptFilter, "", "", "", "NFO NIFTY OPT - m1 [" + m1NFO + "]"},
+		{"NFO", m1NFOBankNiftyOptFilter, "", "", "", "NFO BANKNIFTY OPT - m1 [" + m1NFO + "]"},
 
-		// {"NFO", m2NFOFutFilter, "", "", "NFO ALL FUT - m2 [" + m2NFO + "]"},
-		// {"NFO", m2NFONiftyOptFilter, "", "", "NFO NIFTY OPT - m2 [" + m2NFO + "]"},
-		// {"NFO", m2NFOBankNiftyOptFilter, "", "", "NFO BANKNIFTY OPT - m2 [" + m2NFO + "]"},
+		{"NFO", m2NFOFutFilter, "", "", "", "NFO ALL FUT - m2 [" + m2NFO + "]"},
+		{"NFO", m2NFONiftyOptFilter, "", "", "", "NFO NIFTY OPT - m2 [" + m2NFO + "]"},
+		{"NFO", m2NFOBankNiftyOptFilter, "", "", "", "NFO BANKNIFTY OPT - m2 [" + m2NFO + "]"},
 	}
 
 	// Process each query
 	for _, q := range queries {
-		result, err := cs.tickerService.UpsertQueriedInstruments(q.exchange, q.tradingsymbol, q.expiry, q.strike)
+		result, err := cs.tickerService.UpsertQueriedInstruments(q.exchange, q.tradingsymbol, q.expiry, q.strike, q.segment)
 		if err != nil {
 			zaplogger.Error("Failed to upsert queried instruments:")
 			zaplogger.Error("  * query      : " + q.description)
@@ -322,7 +324,7 @@ func (cs *CronService) tickerInstrumentsUpdateJob() {
 				continue
 			}
 
-			result, err := cs.tickerService.UpsertQueriedInstruments(parts[0], parts[1], "", "")
+			result, err := cs.tickerService.UpsertQueriedInstruments(parts[0], parts[1], "", "", "")
 			if err != nil {
 				failedInstruments = append(failedInstruments, instr)
 				continue
