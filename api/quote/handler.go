@@ -6,8 +6,8 @@ import (
 	"net/http"
 
 	"github.com/labstack/echo/v4"
-	"github.com/nsvirk/moneybotsapi/ticker"
-	"github.com/nsvirk/moneybotsapi/utils"
+	"github.com/nsvirk/moneybotsapi/api/ticker"
+	"github.com/nsvirk/moneybotsapi/shared/response"
 )
 
 type Handler struct {
@@ -33,29 +33,29 @@ func (h *Handler) GetLTP(c echo.Context) error {
 func (h *Handler) handleRequest(c echo.Context, mapper func(*ticker.TickerData) interface{}) error {
 	instruments := c.QueryParams()["i"]
 	if len(instruments) == 0 {
-		return utils.ErrorResponse(c, http.StatusBadRequest, "InputException", "No instruments specified")
+		return response.ErrorResponse(c, http.StatusBadRequest, "InputException", "No instruments specified")
 	}
 
 	tickDataMap, err := h.service.GetTickData(instruments)
 	if err != nil {
 		log.Printf("Error fetching tick data: %v", err)
-		return utils.ErrorResponse(c, http.StatusInternalServerError, "ServerException", fmt.Sprintf("Error fetching tick data: %v", err))
+		return response.ErrorResponse(c, http.StatusInternalServerError, "ServerException", fmt.Sprintf("Error fetching tick data: %v", err))
 	}
 
-	response := QuoteResponse{
+	quoteResponse := QuoteResponse{
 		Status: "success",
 		Data:   make(map[string]interface{}),
 	}
 
 	for _, instrument := range instruments {
 		if tickData, ok := tickDataMap[instrument]; ok {
-			response.Data[instrument] = mapper(tickData)
+			quoteResponse.Data[instrument] = mapper(tickData)
 		}
 	}
 
-	if len(response.Data) == 0 {
-		return utils.ErrorResponse(c, http.StatusNotFound, "DataNotFound", fmt.Sprintf("No data found for instruments: %v", instruments))
+	if len(quoteResponse.Data) == 0 {
+		return response.ErrorResponse(c, http.StatusNotFound, "DataNotFound", fmt.Sprintf("No data found for instruments: %v", instruments))
 	}
 
-	return c.JSON(http.StatusOK, response)
+	return c.JSON(http.StatusOK, quoteResponse)
 }

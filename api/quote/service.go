@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/nsvirk/moneybotsapi/ticker"
+	"github.com/nsvirk/moneybotsapi/api/ticker"
 	"gorm.io/gorm"
 )
 

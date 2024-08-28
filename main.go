@@ -8,9 +8,9 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/nsvirk/moneybotsapi/config"
 	"github.com/nsvirk/moneybotsapi/database"
-	"github.com/nsvirk/moneybotsapi/middleware"
 	"github.com/nsvirk/moneybotsapi/services"
-	"github.com/nsvirk/moneybotsapi/utils/applogger"
+	"github.com/nsvirk/moneybotsapi/shared/applogger"
+	"github.com/nsvirk/moneybotsapi/shared/middleware"
 )
 
 func main() {

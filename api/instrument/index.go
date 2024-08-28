@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/nsvirk/moneybotsapi/utils/applogger"
+	"github.com/nsvirk/moneybotsapi/shared/applogger"
 )
 
 var IndexURLMap = map[string]string{

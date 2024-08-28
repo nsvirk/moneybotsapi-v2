@@ -5,8 +5,8 @@ import (
 	"strings"
 
 	"github.com/labstack/echo/v4"
-	"github.com/nsvirk/moneybotsapi/session"
-	"github.com/nsvirk/moneybotsapi/utils"
+	"github.com/nsvirk/moneybotsapi/api/session"
+	"github.com/nsvirk/moneybotsapi/shared/response"
 )
 
 // AuthMiddleware creates a new authorization middleware
@@ -15,19 +15,19 @@ func AuthMiddleware(sessionService *session.Service) echo.MiddlewareFunc {
 		return func(c echo.Context) error {
 			auth := c.Request().Header.Get("Authorization")
 			if auth == "" {
-				return utils.ErrorResponse(c, http.StatusUnauthorized, "AuthorizationException", "Missing Authorization header")
+				return response.ErrorResponse(c, http.StatusUnauthorized, "AuthorizationException", "Missing Authorization header")
 			}
 
 			parts := strings.SplitN(auth, ":", 2)
 			if len(parts) != 2 {
-				return utils.ErrorResponse(c, http.StatusUnauthorized, "AuthorizationException", "Invalid Authorization header format")
+				return response.ErrorResponse(c, http.StatusUnauthorized, "AuthorizationException", "Invalid Authorization header format")
 			}
 
 			userID, enctoken := parts[0], parts[1]
 
 			sessionData, err := sessionService.VerifySession(userID, enctoken)
 			if err != nil {
-				return utils.ErrorResponse(c, http.StatusUnauthorized, "AuthorizationException", "Invalid or expired session")
+				return response.ErrorResponse(c, http.StatusUnauthorized, "AuthorizationException", "Invalid or expired session")
 			}
 
 			// Add session data to context for use in handlers

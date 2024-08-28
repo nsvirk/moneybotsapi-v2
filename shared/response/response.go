@@ -1,5 +1,4 @@
-// Package utils provides utility functions for the API
-package utils
+package response
 
 import (
 	"net/http"

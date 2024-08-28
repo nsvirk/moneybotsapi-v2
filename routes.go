@@ -6,13 +6,13 @@ import (
 	"log"
 
 	"github.com/labstack/echo/v4"
+	"github.com/nsvirk/moneybotsapi/api/instrument"
+	"github.com/nsvirk/moneybotsapi/api/quote"
+	"github.com/nsvirk/moneybotsapi/api/session"
+	"github.com/nsvirk/moneybotsapi/api/ticker"
 	"github.com/nsvirk/moneybotsapi/config"
-	"github.com/nsvirk/moneybotsapi/instrument"
-	"github.com/nsvirk/moneybotsapi/middleware"
-	"github.com/nsvirk/moneybotsapi/quote"
-	"github.com/nsvirk/moneybotsapi/session"
-	"github.com/nsvirk/moneybotsapi/ticker"
-	"github.com/nsvirk/moneybotsapi/utils"
+	"github.com/nsvirk/moneybotsapi/shared/middleware"
+	"github.com/nsvirk/moneybotsapi/shared/response"
 	"github.com/redis/go-redis/v9"
 	"gorm.io/gorm"
 )
@@ -79,5 +79,5 @@ func indexRoute(c echo.Context) error {
 		log.Fatalf("Failed to load configuration: %v", err)
 	}
 	message := fmt.Sprintf("%s %s", cfg.APIName, cfg.APIVersion)
-	return utils.SuccessResponse(c, message)
+	return response.SuccessResponse(c, message)
 }

@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/labstack/echo/v4"
-	"github.com/nsvirk/moneybotsapi/utils"
+	"github.com/nsvirk/moneybotsapi/shared/response"
 )
 
 type Handler struct {
@@ -25,15 +25,15 @@ func (h *Handler) StartTicker(c echo.Context) error {
 	}
 
 	if err := h.service.Start(userID, enctoken); err != nil {
-		return utils.ErrorResponse(c, http.StatusInternalServerError, "TickerException", err.Error())
+		return response.ErrorResponse(c, http.StatusInternalServerError, "TickerException", err.Error())
 	}
 
 	instruments, err := h.service.GetTickerInstruments()
 	if err != nil {
-		return utils.ErrorResponse(c, http.StatusInternalServerError, "DatabaseException", err.Error())
+		return response.ErrorResponse(c, http.StatusInternalServerError, "DatabaseException", err.Error())
 	}
 
-	return utils.SuccessResponse(c, map[string]interface{}{
+	return response.SuccessResponse(c, map[string]interface{}{
 		"timestamp": time.Now().Format(time.RFC3339),
 		"records":   len(instruments),
 		"message":   "started",
@@ -42,10 +42,10 @@ func (h *Handler) StartTicker(c echo.Context) error {
 
 func (h *Handler) StopTicker(c echo.Context) error {
 	if err := h.service.Stop(); err != nil {
-		return utils.ErrorResponse(c, http.StatusBadRequest, "InputException", err.Error())
+		return response.ErrorResponse(c, http.StatusBadRequest, "InputException", err.Error())
 	}
 
-	return utils.SuccessResponse(c, map[string]interface{}{
+	return response.SuccessResponse(c, map[string]interface{}{
 		"timestamp": time.Now().Format(time.RFC3339),
 		"message":   "stopped",
 	})
@@ -58,15 +58,15 @@ func (h *Handler) RestartTicker(c echo.Context) error {
 	}
 
 	if err := h.service.Restart(userID, enctoken); err != nil {
-		return utils.ErrorResponse(c, http.StatusInternalServerError, "TickerException", err.Error())
+		return response.ErrorResponse(c, http.StatusInternalServerError, "TickerException", err.Error())
 	}
 
 	instruments, err := h.service.GetTickerInstruments()
 	if err != nil {
-		return utils.ErrorResponse(c, http.StatusInternalServerError, "DatabaseException", err.Error())
+		return response.ErrorResponse(c, http.StatusInternalServerError, "DatabaseException", err.Error())
 	}
 
-	return utils.SuccessResponse(c, map[string]interface{}{
+	return response.SuccessResponse(c, map[string]interface{}{
 		"timestamp": time.Now().Format(time.RFC3339),
 		"records":   len(instruments),
 		"message":   "restarted",
@@ -76,7 +76,7 @@ func (h *Handler) RestartTicker(c echo.Context) error {
 func (h *Handler) GetInstruments(c echo.Context) error {
 	instruments, err := h.service.GetTickerInstruments()
 	if err != nil {
-		return utils.ErrorResponse(c, http.StatusInternalServerError, "DatabaseException", "Failed to fetch instruments")
+		return response.ErrorResponse(c, http.StatusInternalServerError, "DatabaseException", "Failed to fetch instruments")
 	}
 
 	respInstruments := make([]string, len(instruments))
@@ -84,7 +84,7 @@ func (h *Handler) GetInstruments(c echo.Context) error {
 		respInstruments[i] = instrument.Instrument
 	}
 
-	return utils.SuccessResponse(c, map[string]interface{}{
+	return response.SuccessResponse(c, map[string]interface{}{
 		"timestamp":   time.Now().Format(time.RFC3339),
 		"records":     len(instruments),
 		"instruments": respInstruments,
@@ -96,20 +96,20 @@ func (h *Handler) AddInstruments(c echo.Context) error {
 		Instruments []string `json:"instruments"`
 	}
 	if err := json.NewDecoder(c.Request().Body).Decode(&req); err != nil {
-		return utils.ErrorResponse(c, http.StatusBadRequest, "InputException", "Invalid JSON body")
+		return response.ErrorResponse(c, http.StatusBadRequest, "InputException", "Invalid JSON body")
 	}
 
-	response, err := h.service.AddTickerInstruments(req.Instruments)
+	instruments, err := h.service.AddTickerInstruments(req.Instruments)
 	if err != nil {
-		return utils.ErrorResponse(c, http.StatusInternalServerError, "DatabaseException", err.Error())
+		return response.ErrorResponse(c, http.StatusInternalServerError, "DatabaseException", err.Error())
 	}
 
 	totalCount, _ := h.service.GetTickerInstrumentCount()
 
-	return utils.SuccessResponse(c, map[string]interface{}{
+	return response.SuccessResponse(c, map[string]interface{}{
 		"timestamp":   time.Now().Format(time.RFC3339),
 		"records":     totalCount,
-		"instruments": response,
+		"instruments": instruments,
 	})
 }
 
@@ -118,15 +118,15 @@ func (h *Handler) DeleteInstruments(c echo.Context) error {
 		Instruments []string `json:"instruments"`
 	}
 	if err := json.NewDecoder(c.Request().Body).Decode(&req); err != nil {
-		return utils.ErrorResponse(c, http.StatusBadRequest, "InputException", "Invalid JSON body")
+		return response.ErrorResponse(c, http.StatusBadRequest, "InputException", "Invalid JSON body")
 	}
 
 	deletedCount, err := h.service.DeleteTickerInstruments(req.Instruments)
 	if err != nil {
-		return utils.ErrorResponse(c, http.StatusInternalServerError, "DatabaseException", err.Error())
+		return response.ErrorResponse(c, http.StatusInternalServerError, "DatabaseException", err.Error())
 	}
 
-	return utils.SuccessResponse(c, map[string]interface{}{
+	return response.SuccessResponse(c, map[string]interface{}{
 		"timestamp": time.Now().Format(time.RFC3339),
 		"records":   deletedCount,
 	})
@@ -136,7 +136,7 @@ func extractAuthInfo(c echo.Context) (string, string, error) {
 	auth := c.Request().Header.Get("Authorization")
 	userID, enctoken, found := strings.Cut(auth, ":")
 	if !found {
-		return "", "", utils.ErrorResponse(c, http.StatusUnauthorized, "InputException", "Invalid authorization header")
+		return "", "", response.ErrorResponse(c, http.StatusUnauthorized, "InputException", "Invalid authorization header")
 	}
 	return userID, enctoken, nil
 }

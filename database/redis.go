@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/nsvirk/moneybotsapi/config"
-	"github.com/nsvirk/moneybotsapi/utils/applogger"
+	"github.com/nsvirk/moneybotsapi/shared/applogger"
 	"github.com/redis/go-redis/v9"
 )
 

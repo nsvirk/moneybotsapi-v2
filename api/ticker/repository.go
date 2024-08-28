@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/nsvirk/moneybotsapi/instrument"
+	"github.com/nsvirk/moneybotsapi/api/instrument"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )

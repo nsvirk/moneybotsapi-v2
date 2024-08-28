@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/labstack/echo/v4"
-	"github.com/nsvirk/moneybotsapi/utils"
+	"github.com/nsvirk/moneybotsapi/shared/response"
 	"gorm.io/gorm"
 )
 
@@ -35,7 +35,7 @@ type UpdateInstrumentsResponseData struct {
 func (h *Handler) UpdateInstruments(c echo.Context) error {
 	totalInserted, err := h.InstrumentService.UpdateInstruments()
 	if err != nil {
-		return utils.ErrorResponse(c, http.StatusInternalServerError, "update_error", err.Error())
+		return response.ErrorResponse(c, http.StatusInternalServerError, "update_error", err.Error())
 	}
 
 	responseData := UpdateInstrumentsResponseData{
@@ -43,14 +43,14 @@ func (h *Handler) UpdateInstruments(c echo.Context) error {
 		Records:   totalInserted,
 	}
 
-	return utils.SuccessResponse(c, responseData)
+	return response.SuccessResponse(c, responseData)
 }
 
 func (h *Handler) GetIndicesInstruments(c echo.Context) error {
 	indices := c.QueryParams()["i"]
 
 	if len(indices) == 0 {
-		return utils.ErrorResponse(c, http.StatusBadRequest, "invalid_request", "No indices provided")
+		return response.ErrorResponse(c, http.StatusBadRequest, "invalid_request", "No indices provided")
 	}
 
 	responseData := make(map[string][]string)
@@ -58,18 +58,18 @@ func (h *Handler) GetIndicesInstruments(c echo.Context) error {
 	for _, indexName := range indices {
 		instruments, err := h.IndexService.FetchIndexInstrumentsList(indexName)
 		if err != nil {
-			return utils.ErrorResponse(c, http.StatusInternalServerError, "fetch_error", fmt.Sprintf("Error fetching instruments for index %s: %v", indexName, err))
+			return response.ErrorResponse(c, http.StatusInternalServerError, "fetch_error", fmt.Sprintf("Error fetching instruments for index %s: %v", indexName, err))
 		}
 
 		responseData[indexName] = instruments
 	}
 
-	return utils.SuccessResponse(c, responseData)
+	return response.SuccessResponse(c, responseData)
 }
 
 func (h *Handler) GetAvailableIndices(c echo.Context) error {
 	indices := h.IndexService.GetAvailableIndices()
-	return utils.SuccessResponse(c, indices)
+	return response.SuccessResponse(c, indices)
 }
 
 func (h *Handler) QueryInstruments(c echo.Context) error {
@@ -81,12 +81,12 @@ func (h *Handler) QueryInstruments(c echo.Context) error {
 
 	instrumentsOnlyBool, err := strconv.ParseBool(instrumentsOnly)
 	if err != nil {
-		return utils.ErrorResponse(c, http.StatusBadRequest, "invalid_request", "Invalid instruments_only value")
+		return response.ErrorResponse(c, http.StatusBadRequest, "invalid_request", "Invalid instruments_only value")
 	}
 
 	instruments, err := h.InstrumentService.QueryInstruments(exchange, tradingsymbol, expiry, strike)
 	if err != nil {
-		return utils.ErrorResponse(c, http.StatusInternalServerError, "query_error", err.Error())
+		return response.ErrorResponse(c, http.StatusInternalServerError, "query_error", err.Error())
 	}
 
 	if instrumentsOnlyBool {
@@ -94,7 +94,7 @@ func (h *Handler) QueryInstruments(c echo.Context) error {
 		for i, inst := range instruments {
 			instrumentsList[i] = fmt.Sprintf("%s:%s", inst.Exchange, inst.Tradingsymbol)
 		}
-		return utils.SuccessResponse(c, instrumentsList)
+		return response.SuccessResponse(c, instrumentsList)
 	} else {
 		instrumentMap := make(map[string]interface{})
 		for _, inst := range instruments {
@@ -107,7 +107,7 @@ func (h *Handler) QueryInstruments(c echo.Context) error {
 				"tradingsymbol":    inst.Tradingsymbol,
 			}
 		}
-		return utils.SuccessResponse(c, instrumentMap)
+		return response.SuccessResponse(c, instrumentMap)
 	}
 }
 
@@ -115,37 +115,37 @@ func (h *Handler) GetInstrumentSymbols(c echo.Context) error {
 	tokenParams := c.QueryParams()["t"]
 
 	if len(tokenParams) == 0 {
-		return utils.ErrorResponse(c, http.StatusBadRequest, "invalid_request", "No instrument tokens provided")
+		return response.ErrorResponse(c, http.StatusBadRequest, "invalid_request", "No instrument tokens provided")
 	}
 
 	var tokens []uint
 	for _, tokenStr := range tokenParams {
 		token, err := strconv.ParseUint(tokenStr, 10, 32)
 		if err != nil {
-			return utils.ErrorResponse(c, http.StatusBadRequest, "invalid_token", "Invalid instrument token format")
+			return response.ErrorResponse(c, http.StatusBadRequest, "invalid_token", "Invalid instrument token format")
 		}
 		tokens = append(tokens, uint(token))
 	}
 
 	instrumentMap, err := h.InstrumentService.GetInstrumentSymbols(tokens)
 	if err != nil {
-		return utils.ErrorResponse(c, http.StatusInternalServerError, "query_error", err.Error())
+		return response.ErrorResponse(c, http.StatusInternalServerError, "query_error", err.Error())
 	}
 
-	return utils.SuccessResponse(c, instrumentMap)
+	return response.SuccessResponse(c, instrumentMap)
 }
 
 func (h *Handler) GetInstrumentTokens(c echo.Context) error {
 	instruments := c.QueryParams()["i"]
 
 	if len(instruments) == 0 {
-		return utils.ErrorResponse(c, http.StatusBadRequest, "invalid_request", "No instruments provided")
+		return response.ErrorResponse(c, http.StatusBadRequest, "invalid_request", "No instruments provided")
 	}
 
 	instrumentMap, err := h.InstrumentService.GetInstrumentTokens(instruments)
 	if err != nil {
-		return utils.ErrorResponse(c, http.StatusInternalServerError, "query_error", err.Error())
+		return response.ErrorResponse(c, http.StatusInternalServerError, "query_error", err.Error())
 	}
 
-	return utils.SuccessResponse(c, instrumentMap)
+	return response.SuccessResponse(c, instrumentMap)
 }

@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
-	"github.com/nsvirk/moneybotsapi/utils"
 	"gorm.io/gorm"
 )
 
@@ -27,7 +27,7 @@ func (r *Repository) InsertInstruments(records [][]string) (int, error) {
 	valueStrings := make([]string, 0, len(records))
 	valueArgs := make([]interface{}, 0, len(records)*13)
 
-	now := utils.CurrentTime()
+	now := time.Now().Format("2006-01-02 15:04:05")
 
 	for _, record := range records {
 		valueStrings = append(valueStrings, "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")

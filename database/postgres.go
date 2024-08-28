@@ -5,11 +5,11 @@ package database
 import (
 	"fmt"
 
+	"github.com/nsvirk/moneybotsapi/api/instrument"
+	"github.com/nsvirk/moneybotsapi/api/session"
+	"github.com/nsvirk/moneybotsapi/api/ticker"
 	"github.com/nsvirk/moneybotsapi/config"
-	"github.com/nsvirk/moneybotsapi/instrument"
-	"github.com/nsvirk/moneybotsapi/session"
-	"github.com/nsvirk/moneybotsapi/ticker"
-	"github.com/nsvirk/moneybotsapi/utils/applogger"
+	"github.com/nsvirk/moneybotsapi/shared/applogger"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"

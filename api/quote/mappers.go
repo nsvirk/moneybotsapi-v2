@@ -3,7 +3,7 @@ package quote
 import (
 	"log"
 
-	"github.com/nsvirk/moneybotsapi/ticker"
+	"github.com/nsvirk/moneybotsapi/api/ticker"
 )
 
 func mapTickToQuoteData(tick *ticker.TickerData) interface{} {

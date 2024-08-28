@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/nsvirk/moneybotsapi/utils/applogger"
+	"github.com/nsvirk/moneybotsapi/shared/applogger"
 	"gorm.io/gorm"
 )
 

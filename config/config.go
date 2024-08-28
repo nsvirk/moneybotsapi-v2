@@ -8,7 +8,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/nsvirk/moneybotsapi/utils/applogger"
+	"github.com/nsvirk/moneybotsapi/shared/applogger"
 )
 
 // Config represents the application configuration
