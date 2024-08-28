@@ -61,10 +61,6 @@ func (s *InstrumentService) UpdateInstruments() (int, error) {
 	return totalInserted, nil
 }
 
-func (s *InstrumentService) QueryInstruments(exchange, tradingsymbol, expiry, strike string) ([]InstrumentModel, error) {
-	return s.repo.QueryInstruments(exchange, tradingsymbol, expiry, strike)
-}
-
 func (s *InstrumentService) GetInstrumentSymbols(tokens []uint) (map[string]string, error) {
 	instruments, err := s.repo.GetInstrumentSymbols(tokens)
 	if err != nil {
@@ -104,4 +100,8 @@ func (s *InstrumentService) GetInstrumentTokens(instruments []string) (map[strin
 	}
 
 	return instrumentMap, nil
+}
+
+func (s *InstrumentService) QueryInstruments(exchange, tradingsymbol, expiry, strike, segment string) ([]InstrumentModel, error) {
+	return s.repo.QueryInstruments(exchange, tradingsymbol, expiry, strike, segment)
 }

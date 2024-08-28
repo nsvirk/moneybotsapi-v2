@@ -77,6 +77,7 @@ func (h *Handler) QueryInstruments(c echo.Context) error {
 	tradingsymbol := c.QueryParam("tradingsymbol")
 	expiry := c.QueryParam("expiry")
 	strike := c.QueryParam("strike")
+	segment := c.QueryParam("segment")
 	details := c.QueryParam("details")
 
 	detailsBool, err := strconv.ParseBool(details)
@@ -86,7 +87,7 @@ func (h *Handler) QueryInstruments(c echo.Context) error {
 		}
 	}
 
-	instruments, err := h.InstrumentService.QueryInstruments(exchange, tradingsymbol, expiry, strike)
+	instruments, err := h.InstrumentService.QueryInstruments(exchange, tradingsymbol, expiry, strike, segment)
 	if err != nil {
 		return response.ErrorResponse(c, http.StatusInternalServerError, "query_error", err.Error())
 	}
@@ -100,6 +101,7 @@ func (h *Handler) QueryInstruments(c echo.Context) error {
 				"expiry":           inst.Expiry,
 				"instrument_token": inst.InstrumentToken,
 				"strike":           inst.Strike,
+				"segment":          inst.Segment,
 				"tradingsymbol":    inst.Tradingsymbol,
 			}
 		}

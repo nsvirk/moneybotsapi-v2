@@ -259,10 +259,6 @@ func (s *Service) processTick(tick kiteticker.Tick, postgresData *[]TickerData) 
 	// ---- SAVE TO POSTGRES -----------------------------------------
 	// Append the tick to the Postgres data slice
 	*postgresData = append(*postgresData, tickerData)
-
-	// ToDo: Remove this print statement
-	// fmt.Println("Processing tick for instrument", instrument)
-
 }
 
 func (s *Service) flushData(postgresData *[]TickerData) {
@@ -377,7 +373,6 @@ func (s *Service) UpsertTickerInstruments(instruments []TickerInstrument) (int, 
 	return s.repo.UpsertTickerInstruments(instruments)
 }
 
-// UpsertQueriedInstruments
 func (s *Service) UpsertQueriedInstruments(exchange, tradingsymbol, expiry, strike, segment string) (map[string]interface{}, error) {
 	return s.repo.UpsertQueriedInstruments(exchange, tradingsymbol, expiry, strike, segment)
 }

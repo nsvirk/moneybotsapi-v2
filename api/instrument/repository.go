@@ -69,7 +69,7 @@ func (r *Repository) InsertInstruments(records [][]string) (int, error) {
 	return int(result.RowsAffected), nil
 }
 
-func (r *Repository) QueryInstruments(exchange, tradingsymbol, expiry, strike string) ([]InstrumentModel, error) {
+func (r *Repository) QueryInstruments(exchange, tradingsymbol, expiry, strike, segment string) ([]InstrumentModel, error) {
 	query := r.DB.Model(&InstrumentModel{})
 
 	if exchange != "" {
@@ -87,6 +87,10 @@ func (r *Repository) QueryInstruments(exchange, tradingsymbol, expiry, strike st
 			return nil, err
 		}
 		query = query.Where("strike = ?", strikeFloat)
+	}
+
+	if segment != "" {
+		query = query.Where("segment LIKE ?", segment)
 	}
 
 	var instruments []InstrumentModel
