@@ -18,7 +18,7 @@ func NewHandler(service *Service) *Handler {
 	return &Handler{service: service}
 }
 
-func (h *Handler) StartTicker(c echo.Context) error {
+func (h *Handler) TickerStart(c echo.Context) error {
 	userID, enctoken, err := extractAuthInfo(c)
 	if err != nil {
 		return err
@@ -40,7 +40,7 @@ func (h *Handler) StartTicker(c echo.Context) error {
 	})
 }
 
-func (h *Handler) StopTicker(c echo.Context) error {
+func (h *Handler) TickerStop(c echo.Context) error {
 	if err := h.service.Stop(); err != nil {
 		return response.ErrorResponse(c, http.StatusBadRequest, "InputException", err.Error())
 	}
@@ -51,7 +51,7 @@ func (h *Handler) StopTicker(c echo.Context) error {
 	})
 }
 
-func (h *Handler) RestartTicker(c echo.Context) error {
+func (h *Handler) TickerRestart(c echo.Context) error {
 	userID, enctoken, err := extractAuthInfo(c)
 	if err != nil {
 		return err
@@ -70,6 +70,15 @@ func (h *Handler) RestartTicker(c echo.Context) error {
 		"timestamp": time.Now().Format(time.RFC3339),
 		"records":   len(instruments),
 		"message":   "restarted",
+	})
+}
+
+// Status returns the current status of the ticker
+func (h *Handler) TickerStatus(c echo.Context) error {
+	status := h.service.Status()
+	return response.SuccessResponse(c, map[string]interface{}{
+		"timestamp": time.Now().Format(time.RFC3339),
+		"status":    status,
 	})
 }
 

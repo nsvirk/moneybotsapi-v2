@@ -56,15 +56,11 @@ func (s *Service) Start(userID, enctoken string) error {
 		return fmt.Errorf("ticker is already running")
 	}
 
-	if err := s.initializeTicker(userID, enctoken); err != nil {
-		return err
-	}
-
+	// Get all ticker instruments
 	tickerInstruments, err := s.repo.GetTickerInstruments()
 	if err != nil {
 		return err
 	}
-
 	tickerInstrumentTokens := make([]uint32, len(tickerInstruments))
 	for i, tickerInstrument := range tickerInstruments {
 		tickerInstrumentTokens[i] = tickerInstrument.InstrumentToken
@@ -75,10 +71,17 @@ func (s *Service) Start(userID, enctoken string) error {
 		return fmt.Errorf("no instruments to subscribe")
 	}
 
+	// Initialize ticker
+	if err := s.initializeTicker(userID, enctoken); err != nil {
+		return err
+	}
+
+	// Subscribe to instruments
 	if err := s.ticker.Subscribe(tickerInstrumentTokens); err != nil {
 		return err
 	}
 
+	// Set ticker mode to full
 	if err := s.ticker.SetMode(kiteticker.ModeFull, tickerInstrumentTokens); err != nil {
 		return err
 	}
@@ -87,7 +90,7 @@ func (s *Service) Start(userID, enctoken string) error {
 	go s.flushTicks()
 	go s.monitorTickerChannel()
 
-	s.repo.LogTickerEvent("Ticker::Start", "Ticker started successfully")
+	s.repo.Info("Ticker::Start", "Ticker started successfully")
 	s.isRunning = true
 
 	return nil
@@ -102,12 +105,14 @@ func (s *Service) Stop() error {
 	}
 
 	s.ticker.Close()
+	// wait one seconds for the ticker to close
+	time.Sleep(1 * time.Second)
 	s.ticker.Stop()
 	s.ticker = nil
 	s.isRunning = false
 	s.cancel()
 
-	s.repo.LogTickerEvent("Ticker::Stop", "Ticker stopped successfully")
+	s.repo.Info("Ticker::Stop", "Ticker stopped successfully")
 	return nil
 }
 
@@ -116,6 +121,11 @@ func (s *Service) Restart(userID, enctoken string) error {
 		return err
 	}
 	return s.Start(userID, enctoken)
+}
+
+// Status returns the current status of the ticker
+func (s *Service) Status() bool {
+	return s.isRunning
 }
 
 func (s *Service) initializeTicker(userID, enctoken string) error {
@@ -147,25 +157,25 @@ func (s *Service) setupTickerCallbacks() {
 	})
 
 	s.ticker.OnConnect(func() {
-		s.repo.LogTickerEvent("Ticker::OnConnect", "Connected to ticker")
+		s.repo.Info("Ticker::OnConnect", "Connected to ticker")
 		s.isRunning = true
 	})
 
 	s.ticker.OnError(func(err error) {
-		s.repo.LogTickerEvent("Ticker::OnError", err.Error())
+		s.repo.Error("Ticker::OnError", err.Error())
 	})
 
 	s.ticker.OnClose(func(code int, reason string) {
-		s.repo.LogTickerEvent("Ticker::OnClose", fmt.Sprintf("Closed with code %d: %s", code, reason))
+		s.repo.Warn("Ticker::OnClose", fmt.Sprintf("Closed with code %d: %s", code, reason))
 		s.isRunning = false
 	})
 
 	s.ticker.OnReconnect(func(attempt int, delay time.Duration) {
-		s.repo.LogTickerEvent("Ticker::OnReconnect", fmt.Sprintf("Reconnecting attempt %d with delay %v", attempt, delay))
+		s.repo.Info("Ticker::OnReconnect", fmt.Sprintf("Reconnecting attempt %d with delay %v", attempt, delay))
 	})
 
 	s.ticker.OnNoReconnect(func(attempt int) {
-		s.repo.LogTickerEvent("Ticker::OnNoReconnect", fmt.Sprintf("No reconnect after %d attempts", attempt))
+		s.repo.Fatal("Ticker::OnNoReconnect", fmt.Sprintf("No reconnect after %d attempts", attempt))
 	})
 }
 
@@ -194,7 +204,7 @@ func (s *Service) processTick(tick kiteticker.Tick, postgresData *[]TickerData) 
 
 	instrument, ok := s.instruments[tick.InstrumentToken]
 	if !ok {
-		s.repo.LogTickerEvent("Ticker::processTick", fmt.Sprintf("instrument not found for token %d", tick.InstrumentToken))
+		s.repo.Error("Ticker::processTick", fmt.Sprintf("instrument not found for token %d", tick.InstrumentToken))
 		return
 	}
 
@@ -206,12 +216,12 @@ func (s *Service) processTick(tick kiteticker.Tick, postgresData *[]TickerData) 
 
 	tickOHLCJson, err := json.Marshal(tick.OHLC)
 	if err != nil {
-		s.repo.LogTickerEvent("Ticker::processTick", fmt.Sprintf("error marshaling tick OHLC to JSON: %v", tick.InstrumentToken))
+		s.repo.Error("Ticker::processTick", fmt.Sprintf("error marshaling tick OHLC to JSON: %v", tick.InstrumentToken))
 
 	}
 	tickDepthJson, err := json.Marshal(tick.Depth)
 	if err != nil {
-		s.repo.LogTickerEvent("Ticker::processTick", fmt.Sprintf("error marshaling tick Depth to JSON: %v", tick.InstrumentToken))
+		s.repo.Error("Ticker::processTick", fmt.Sprintf("error marshaling tick Depth to JSON: %v", tick.InstrumentToken))
 	}
 
 	// Round NetChange to 2 decimal points
@@ -233,15 +243,15 @@ func (s *Service) processTick(tick kiteticker.Tick, postgresData *[]TickerData) 
 		TotalBuyQuantity:   tick.TotalBuyQuantity,
 		TotalSellQuantity:  tick.TotalSellQuantity,
 		VolumeTraded:       tick.VolumeTraded,
-		TotalBuy:           tick.TotalBuy,
-		TotalSell:          tick.TotalSell,
-		AverageTradePrice:  tick.AverageTradePrice,
-		OI:                 tick.OI,
-		OIDayHigh:          tick.OIDayHigh,
-		OIDayLow:           tick.OIDayLow,
-		NetChange:          roundedNetChange,
-		OHLC:               tickOHLCJson,
-		Depth:              tickDepthJson,
+		// TotalBuy:           tick.TotalBuy,
+		// TotalSell:          tick.TotalSell,
+		AverageTradePrice: tick.AverageTradePrice,
+		OI:                tick.OI,
+		OIDayHigh:         tick.OIDayHigh,
+		OIDayLow:          tick.OIDayLow,
+		NetChange:         roundedNetChange,
+		OHLC:              tickOHLCJson,
+		Depth:             tickDepthJson,
 		// Tick:               tickJson,
 		UpdatedAt: time.Now(),
 	}
@@ -259,7 +269,7 @@ func (s *Service) flushData(postgresData *[]TickerData) {
 
 	if len(*postgresData) > 0 {
 		if err := s.repo.UpsertTickerData(*postgresData); err != nil {
-			s.repo.LogTickerEvent("Ticker::flushData:PostgresError", fmt.Sprintf("Failed to save ticks to Postgres: %v", err))
+			s.repo.Error("Ticker::flushData:PostgresError", fmt.Sprintf("Failed to save ticks to Postgres: %v", err))
 		}
 		*postgresData = (*postgresData)[:0]
 	}
@@ -394,7 +404,7 @@ func (s *Service) monitorTickerChannel() {
 
 			if capacityPercentage >= channelCapacityWarningThreshold {
 				warningMsg := fmt.Sprintf("Ticker channel is %.2f%% full (%d/%d)", capacityPercentage*100, currentCapacity, channelCapacity)
-				s.repo.LogTickerEvent("Ticker::ChannelWarning", warningMsg)
+				s.repo.Warn("Ticker::ChannelWarning", warningMsg)
 
 				// You might want to take additional actions here, such as:
 				// - Slowing down the ticker

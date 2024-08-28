@@ -5,14 +5,14 @@ import (
 	"time"
 
 	"github.com/nsvirk/moneybotsapi/config"
-	"github.com/nsvirk/moneybotsapi/shared/applogger"
+	"github.com/nsvirk/moneybotsapi/shared/zaplogger"
 	"github.com/redis/go-redis/v9"
 )
 
 func ConnectRedis(cfg *config.Config) (*redis.Client, error) {
 
-	applogger.Info(config.SingleLine)
-	applogger.Info("Connecting to Redis")
+	zaplogger.Info(config.SingleLine)
+	zaplogger.Info("Connecting to Redis")
 
 	// Setup Redis
 	redisOpts, err := redis.ParseURL(cfg.RedisUrl)
@@ -32,7 +32,7 @@ func ConnectRedis(cfg *config.Config) (*redis.Client, error) {
 		return nil, err
 	}
 
-	applogger.Info("  * connected")
+	zaplogger.Info("  * connected")
 
 	return redisClient, nil
 

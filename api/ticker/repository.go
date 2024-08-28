@@ -204,13 +204,40 @@ func (r *Repository) UpsertTickerData(tickerData []TickerData) error {
 // --------------------------------------------
 // TickerLog func's grouped together
 // --------------------------------------------
-func (r *Repository) LogTickerEvent(eventType, message string) error {
+func (r *Repository) log(level LogLevel, eventType, message string) error {
+	timestamp := time.Now()
 	log := TickerLog{
-		EventType: eventType,
-		Message:   message,
-		CreatedAt: time.Now(),
+		Timestamp: &timestamp,
+		Level:     &level,
+		EventType: &eventType,
+		Message:   &message,
 	}
 	return r.DB.Create(&log).Error
+}
+
+// Debug logs a debug message
+func (r *Repository) Debug(eventType, message string) error {
+	return r.log(DEBUG, eventType, message)
+}
+
+// Info logs an info message
+func (r *Repository) Info(eventType, message string) error {
+	return r.log(INFO, eventType, message)
+}
+
+// Warn logs a warning message
+func (r *Repository) Warn(eventType, message string) error {
+	return r.log(WARN, eventType, message)
+}
+
+// Error logs an error message
+func (r *Repository) Error(eventType, message string) error {
+	return r.log(ERROR, eventType, message)
+}
+
+// Fatal logs a fatal message
+func (r *Repository) Fatal(eventType, message string) error {
+	return r.log(FATAL, eventType, message)
 }
 
 // --------------------------------------------

@@ -8,7 +8,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/nsvirk/moneybotsapi/shared/applogger"
+	"github.com/nsvirk/moneybotsapi/shared/zaplogger"
 )
 
 // Config represents the application configuration
@@ -38,8 +38,8 @@ var (
 
 // Get returns the application configuration
 func Get() (*Config, error) {
-	applogger.Info(SingleLine)
-	applogger.Info("Loading Configuration")
+	zaplogger.Info(SingleLine)
+	zaplogger.Info("Loading Configuration")
 
 	once.Do(func() {
 		instance, err = loadConfig()

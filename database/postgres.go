@@ -9,7 +9,7 @@ import (
 	"github.com/nsvirk/moneybotsapi/api/session"
 	"github.com/nsvirk/moneybotsapi/api/ticker"
 	"github.com/nsvirk/moneybotsapi/config"
-	"github.com/nsvirk/moneybotsapi/shared/applogger"
+	"github.com/nsvirk/moneybotsapi/shared/zaplogger"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
@@ -17,8 +17,8 @@ import (
 
 // ConnectPostgres connects to a Postgres database and returns a GORM database object
 func ConnectPostgres(cfg *config.Config) (*gorm.DB, error) {
-	applogger.Info(config.SingleLine)
-	applogger.Info("Initializing Postgres")
+	zaplogger.Info(config.SingleLine)
+	zaplogger.Info("Initializing Postgres")
 
 	// Set up GORM logger
 	var logLevel logger.LogLevel
@@ -44,8 +44,8 @@ func ConnectPostgres(cfg *config.Config) (*gorm.DB, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to Postgres: %v", err)
 	}
-	applogger.Info("  * connected")
-	applogger.Info("  * checking tables")
+	zaplogger.Info("  * connected")
+	zaplogger.Info("  * checking tables")
 
 	// AutoMigrate will create tables and add/modify columns
 	if err := autoMigrate(db); err != nil {
@@ -84,7 +84,7 @@ func verifyTables(db *gorm.DB) error {
 
 	for _, table := range tables {
 		if db.Migrator().HasTable(table.model) {
-			applogger.Info("    - " + table.name + " \u2714")
+			zaplogger.Info("    - " + table.name + " \u2714")
 		} else {
 			return fmt.Errorf("failed to create table: " + table.name)
 		}

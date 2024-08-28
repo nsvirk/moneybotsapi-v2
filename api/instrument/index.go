@@ -6,8 +6,6 @@ import (
 	"encoding/csv"
 	"fmt"
 	"net/http"
-
-	"github.com/nsvirk/moneybotsapi/shared/applogger"
 )
 
 var IndexURLMap = map[string]string{
@@ -39,7 +37,6 @@ func NewIndexService() *IndexService {
 
 func (s *IndexService) FetchIndexInstrumentsList(indexName string) ([]string, error) {
 	url, ok := IndexURLMap[indexName]
-	applogger.Info("Fetching index instruments list for index: " + indexName)
 	if !ok {
 		return nil, fmt.Errorf("invalid index: %s", indexName)
 	}

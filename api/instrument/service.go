@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/nsvirk/moneybotsapi/shared/applogger"
+	"github.com/nsvirk/moneybotsapi/shared/zaplogger"
 	"gorm.io/gorm"
 )
 
@@ -52,7 +52,7 @@ func (s *InstrumentService) UpdateInstruments() (int, error) {
 
 		inserted, err := s.repo.InsertInstruments(records[i:end])
 		if err != nil {
-			applogger.Error("Failed to insert batch", applogger.Fields{"startIndex": i, "error": err})
+			zaplogger.Error("Failed to insert batch", zaplogger.Fields{"startIndex": i, "error": err})
 			return totalInserted, fmt.Errorf("failed to insert batch starting at index %d: %v", i, err)
 		}
 		totalInserted += inserted

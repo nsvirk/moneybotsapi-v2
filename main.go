@@ -9,29 +9,31 @@ import (
 	"github.com/nsvirk/moneybotsapi/config"
 	"github.com/nsvirk/moneybotsapi/database"
 	"github.com/nsvirk/moneybotsapi/services"
-	"github.com/nsvirk/moneybotsapi/shared/applogger"
+	"github.com/nsvirk/moneybotsapi/shared/logger"
 	"github.com/nsvirk/moneybotsapi/shared/middleware"
+	"github.com/nsvirk/moneybotsapi/shared/zaplogger"
 )
 
 func main() {
 	// Setup logger
-	defer applogger.Sync()
-	applogger.SetLogLevel("debug")
+	defer zaplogger.Sync()
+	zaplogger.SetLogLevel("debug")
 
 	// startUpMessage
-	applogger.Info(config.SingleLine)
-	applogger.Info("Moneybots API")
+	zaplogger.Info(config.SingleLine)
+	zaplogger.Info("Moneybots API")
 
 	// Load configuration
 	cfg, err := config.Get()
 	if err != nil {
-		applogger.Fatal("failed to load configuration", applogger.Fields{"error": err})
+		zaplogger.Fatal("failed to load configuration", zaplogger.Fields{"error": err})
 	} else {
-		applogger.Info("  * loaded")
-		// applogger.Info(config.SingleLine)
+		zaplogger.Info("  * loaded")
+		// zaplogger.Info(config.SingleLine)
 	}
 
-	// fmt.Println(cfg.String())
+	// Print the configuration
+	fmt.Println(cfg.String())
 
 	// Create a new Echo instance
 	e := echo.New()
@@ -53,11 +55,28 @@ func main() {
 		log.Fatalf("Failed to connect to Redis: %v", err)
 	}
 
+	// Initialize the logger - logs will be stored in the database
+	logger, err := logger.New(db)
+	if err != nil {
+		panic(err)
+	}
+
+	// Use the logger
+	err = logger.Info("Application started", map[string]interface{}{
+		"name":    cfg.APIName,
+		"version": cfg.APIVersion,
+	})
+	if err != nil {
+		panic(err)
+	}
+
+	logger.Info("Application dummy", nil)
+
 	// Setup routes
 	setupRoutes(e, db, redisClient)
 
 	// Setup and start cron jobs
-	cronService := services.NewCronService(e, cfg, db, redisClient)
+	cronService := services.NewCronService(e, cfg, db, redisClient, logger)
 	cronService.Start()
 
 	// Start the server
@@ -73,9 +92,9 @@ func startServer(e *echo.Echo, cfg *config.Config) {
 	}
 	startupMessage := fmt.Sprintf("%s %s Server [:%s] started", cfg.APIName, cfg.APIVersion, cfg.ServerPort)
 
-	applogger.Info(config.SingleLine)
-	applogger.Info(startupMessage)
-	applogger.Info(config.SingleLine)
+	zaplogger.Info(config.SingleLine)
+	zaplogger.Info(startupMessage)
+	zaplogger.Info(config.SingleLine)
 	e.Logger.Infof(startupMessage)
 	e.Logger.Fatal(e.Start(":" + port))
 }

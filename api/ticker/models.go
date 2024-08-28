@@ -15,6 +15,7 @@ const (
 	TickerLogTableName         = "api_ticker_logs"
 )
 
+// TICKER INSTRUMENTS -------------------------------------------------
 // TickerInstrument represents the instruments for which tick data is subscribed
 type TickerInstrument struct {
 	InstrumentToken uint32    `gorm:"primaryKey"  json:"instrument_token"`
@@ -23,30 +24,35 @@ type TickerInstrument struct {
 	UpdatedAt       time.Time `gorm:"autoUpdateTime" json:"updated_at"`
 }
 
+func (TickerInstrument) TableName() string {
+	return TickerInstrumentsTableName
+}
+
+// TICKER DATA --------------------------------------------------------
 // TickerData represents the tick data for an instrument
 type TickerData struct {
-	Instrument         string         `gorm:"index" json:"instrument"`
-	Mode               string         `gorm:"type:varchar(10)" json:"mode"`
-	InstrumentToken    uint32         `gorm:"primaryKey"  json:"instrument_token"`
-	IsTradable         bool           `json:"is_tradable"`
-	IsIndex            bool           `json:"is_index"`
-	Timestamp          time.Time      `json:"timestamp"`
-	LastTradeTime      time.Time      `json:"last_trade_time"`
-	LastPrice          float64        `gorm:"type:decimal(10,2);column:last_price" json:"last_price"`
-	LastTradedQuantity uint32         `gorm:"type:bigint;column:last_traded_quantity" json:"last_traded_quantity"`
-	TotalBuyQuantity   uint32         `gorm:"type:bigint;column:total_buy_quantity" json:"total_buy_quantity"`
-	TotalSellQuantity  uint32         `gorm:"type:bigint;column:total_sell_quantity" json:"total_sell_quantity"`
-	VolumeTraded       uint32         `gorm:"type:bigint;column:volume" json:"volume"`
-	TotalBuy           uint32         `gorm:"type:bigint" json:"total_buy"`
-	TotalSell          uint32         `gorm:"type:bigint" json:"total_sell"`
-	AverageTradePrice  float64        `gorm:"type:decimal(10,2);column:average_price" json:"average_price"`
-	OI                 uint32         `gorm:"type:bigint;column:oi" json:"oi"`
-	OIDayHigh          uint32         `gorm:"type:bigint;column:oi_day_high" json:"oi_day_high"`
-	OIDayLow           uint32         `gorm:"type:bigint;column:oi_day_low" json:"oi_day_low"`
-	NetChange          float64        `gorm:"type:decimal(10,2)" json:"net_change"`
-	OHLC               datatypes.JSON `gorm:"type:jsonb;column:ohlc" json:"ohlc"`
-	Depth              datatypes.JSON `gorm:"type:jsonb;column:depth" json:"depth"`
-	UpdatedAt          time.Time      `gorm:"autoUpdateTime:nano"  json:"updated_at"`
+	Instrument         string    `gorm:"index" json:"instrument"`
+	Mode               string    `gorm:"type:varchar(10)" json:"mode"`
+	InstrumentToken    uint32    `gorm:"primaryKey"  json:"instrument_token"`
+	IsTradable         bool      `json:"is_tradable"`
+	IsIndex            bool      `json:"is_index"`
+	Timestamp          time.Time `json:"timestamp"`
+	LastTradeTime      time.Time `json:"last_trade_time"`
+	LastPrice          float64   `gorm:"type:decimal(10,2);column:last_price" json:"last_price"`
+	LastTradedQuantity uint32    `gorm:"type:bigint;column:last_traded_quantity" json:"last_traded_quantity"`
+	TotalBuyQuantity   uint32    `gorm:"type:bigint;column:total_buy_quantity" json:"total_buy_quantity"`
+	TotalSellQuantity  uint32    `gorm:"type:bigint;column:total_sell_quantity" json:"total_sell_quantity"`
+	VolumeTraded       uint32    `gorm:"type:bigint;column:volume" json:"volume"`
+	// TotalBuy           uint32         `gorm:"type:bigint" json:"total_buy"`
+	// TotalSell          uint32         `gorm:"type:bigint" json:"total_sell"`
+	AverageTradePrice float64        `gorm:"type:decimal(10,2);column:average_price" json:"average_price"`
+	OI                uint32         `gorm:"type:bigint;column:oi" json:"oi"`
+	OIDayHigh         uint32         `gorm:"type:bigint;column:oi_day_high" json:"oi_day_high"`
+	OIDayLow          uint32         `gorm:"type:bigint;column:oi_day_low" json:"oi_day_low"`
+	NetChange         float64        `gorm:"type:decimal(10,2)" json:"net_change"`
+	OHLC              datatypes.JSON `gorm:"type:jsonb;column:ohlc" json:"ohlc"`
+	Depth             datatypes.JSON `gorm:"type:jsonb;column:depth" json:"depth"`
+	UpdatedAt         time.Time      `gorm:"autoUpdateTime:nano"  json:"updated_at"`
 }
 
 type TickerDataOHLC struct {
@@ -79,23 +85,8 @@ func (t *TickerData) GetDepth() (TickerDataDepth, error) {
 	return depth, err
 }
 
-type TickerLog struct {
-	ID        uint32    `gorm:"primaryKey"`
-	EventType string    `gorm:"type:varchar(100)" json:"event_type"`
-	Message   string    `gorm:"type:text" json:"message"`
-	CreatedAt time.Time `gorm:"autoCreateTime" json:"created_at"`
-}
-
-func (TickerInstrument) TableName() string {
-	return TickerInstrumentsTableName
-}
-
 func (TickerData) TableName() string {
 	return TickerDataTableName
-}
-
-func (TickerLog) TableName() string {
-	return TickerLogTableName
 }
 
 func (o *TickerDataOHLC) Scan(value interface{}) error {
@@ -109,4 +100,28 @@ func (o *TickerDataOHLC) Scan(value interface{}) error {
 
 func (o TickerDataOHLC) Value() (driver.Value, error) {
 	return json.Marshal(o)
+}
+
+// TICKER LOGS -----------------------------------------------------
+// LogLevel represents the severity of a log message
+type LogLevel string
+
+const (
+	DEBUG LogLevel = "DEBUG"
+	INFO  LogLevel = "INFO"
+	WARN  LogLevel = "WARN"
+	ERROR LogLevel = "ERROR"
+	FATAL LogLevel = "FATAL"
+)
+
+type TickerLog struct {
+	ID        uint32     `gorm:"primaryKey"`
+	Timestamp *time.Time `gorm:"index"`
+	Level     *LogLevel
+	EventType *string
+	Message   *string
+}
+
+func (TickerLog) TableName() string {
+	return TickerLogTableName
 }

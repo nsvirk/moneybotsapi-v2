@@ -36,16 +36,16 @@ type QuoteData struct {
 	TotalBuyQuantity   uint32  `json:"total_buy_quantity"`
 	TotalSellQuantity  uint32  `json:"total_sell_quantity"`
 	VolumeTraded       uint32  `json:"volume"`
-	TotalBuy           uint32  `json:"total_buy"`
-	TotalSell          uint32  `json:"total_sell"`
-	AverageTradePrice  float64 `json:"average_price"`
-	OI                 uint32  `json:"oi"`
-	OIDayHigh          uint32  `json:"oi_day_high"`
-	OIDayLow           uint32  `json:"oi_day_low"`
-	NetChange          float64 `json:"net_change"`
-	OHLC               OHLC    `json:"ohlc"`
-	Depth              Depth   `json:"depth"`
-	UpdatedAt          string  `json:"-"`
+	// TotalBuy           uint32  `json:"total_buy"`
+	// TotalSell          uint32  `json:"total_sell"`
+	AverageTradePrice float64 `json:"average_price"`
+	OI                uint32  `json:"oi"`
+	OIDayHigh         uint32  `json:"oi_day_high"`
+	OIDayLow          uint32  `json:"oi_day_low"`
+	NetChange         float64 `json:"net_change"`
+	OHLC              OHLC    `json:"ohlc"`
+	Depth             Depth   `json:"depth"`
+	UpdatedAt         string  `json:"-"`
 }
 
 type OHLCData struct {
@@ -63,5 +63,5 @@ type LTPData struct {
 	InstrumentToken uint32  `json:"-"`
 	LastPrice       float64 `json:"last_price"`
 	Timestamp       string  `json:"timestamp"`
-	UpdatedAt       string  `json:"updated_at"`
+	UpdatedAt       string  `json:"-"`
 }

@@ -77,11 +77,13 @@ func (h *Handler) QueryInstruments(c echo.Context) error {
 	tradingsymbol := c.QueryParam("tradingsymbol")
 	expiry := c.QueryParam("expiry")
 	strike := c.QueryParam("strike")
-	instrumentsOnly := c.QueryParam("instruments_only")
+	details := c.QueryParam("details")
 
-	instrumentsOnlyBool, err := strconv.ParseBool(instrumentsOnly)
-	if err != nil {
-		return response.ErrorResponse(c, http.StatusBadRequest, "invalid_request", "Invalid instruments_only value")
+	detailsBool, err := strconv.ParseBool(details)
+	if details != "" {
+		if err != nil {
+			return response.ErrorResponse(c, http.StatusBadRequest, "invalid_request", "Invalid details value")
+		}
 	}
 
 	instruments, err := h.InstrumentService.QueryInstruments(exchange, tradingsymbol, expiry, strike)
@@ -89,13 +91,7 @@ func (h *Handler) QueryInstruments(c echo.Context) error {
 		return response.ErrorResponse(c, http.StatusInternalServerError, "query_error", err.Error())
 	}
 
-	if instrumentsOnlyBool {
-		instrumentsList := make([]string, len(instruments))
-		for i, inst := range instruments {
-			instrumentsList[i] = fmt.Sprintf("%s:%s", inst.Exchange, inst.Tradingsymbol)
-		}
-		return response.SuccessResponse(c, instrumentsList)
-	} else {
+	if detailsBool {
 		instrumentMap := make(map[string]interface{})
 		for _, inst := range instruments {
 			symbol := fmt.Sprintf("%s:%s", inst.Exchange, inst.Tradingsymbol)
@@ -108,6 +104,12 @@ func (h *Handler) QueryInstruments(c echo.Context) error {
 			}
 		}
 		return response.SuccessResponse(c, instrumentMap)
+	} else {
+		instrumentsList := make([]string, len(instruments))
+		for i, inst := range instruments {
+			instrumentsList[i] = fmt.Sprintf("%s:%s", inst.Exchange, inst.Tradingsymbol)
+		}
+		return response.SuccessResponse(c, instrumentsList)
 	}
 }
 

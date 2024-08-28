@@ -25,13 +25,13 @@ func AuthMiddleware(sessionService *session.Service) echo.MiddlewareFunc {
 
 			userID, enctoken := parts[0], parts[1]
 
-			sessionData, err := sessionService.VerifySession(userID, enctoken)
+			userSession, err := sessionService.VerifySession(userID, enctoken)
 			if err != nil {
 				return response.ErrorResponse(c, http.StatusUnauthorized, "AuthorizationException", "Invalid or expired session")
 			}
 
 			// Add session data to context for use in handlers
-			c.Set("sessionData", sessionData)
+			c.Set("userSession", userSession)
 
 			return next(c)
 		}

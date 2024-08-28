@@ -1,4 +1,4 @@
-package applogger
+package zaplogger
 
 import (
 	"time"
