@@ -21,11 +21,12 @@ const (
 
 // APILog represents a log entry in the database
 type APILog struct {
-	ID        uint       `gorm:"primaryKey"`
-	Timestamp *time.Time `gorm:"index"`
-	Level     *LogLevel
-	Message   *string
-	Fields    *string // JSON string of fields
+	ID         uint       `gorm:"primaryKey"`
+	Timestamp  *time.Time `gorm:"index"`
+	Level      *LogLevel  `gorm:"index"`
+	Identifier *string    `gorm:"index"`
+	Message    *string
+	Fields     *string // JSON string of fields
 }
 
 // TableName overrides the table name used by APILog
@@ -47,7 +48,7 @@ func New(db *gorm.DB) (*Logger, error) {
 }
 
 // log is a helper function to insert a log entry into the database
-func (l *Logger) log(level LogLevel, message string, fields map[string]interface{}) error {
+func (l *Logger) log(level LogLevel, identifier, message string, fields map[string]interface{}) error {
 	var fieldsJSON *string
 	if len(fields) > 0 {
 		jsonStr, err := json.Marshal(fields)
@@ -60,10 +61,11 @@ func (l *Logger) log(level LogLevel, message string, fields map[string]interface
 
 	timestamp := time.Now()
 	entry := APILog{
-		Timestamp: &timestamp,
-		Level:     &level,
-		Message:   &message,
-		Fields:    fieldsJSON,
+		Timestamp:  &timestamp,
+		Level:      &level,
+		Identifier: &identifier,
+		Message:    &message,
+		Fields:     fieldsJSON,
 	}
 
 	if err := l.db.Create(&entry).Error; err != nil {
@@ -74,26 +76,26 @@ func (l *Logger) log(level LogLevel, message string, fields map[string]interface
 }
 
 // Debug logs a debug message
-func (l *Logger) Debug(message string, fields map[string]interface{}) error {
-	return l.log(DEBUG, message, fields)
+func (l *Logger) Debug(identifier, message string, fields map[string]interface{}) error {
+	return l.log(DEBUG, identifier, message, fields)
 }
 
 // Info logs an info message
-func (l *Logger) Info(message string, fields map[string]interface{}) error {
-	return l.log(INFO, message, fields)
+func (l *Logger) Info(identifier, message string, fields map[string]interface{}) error {
+	return l.log(INFO, identifier, message, fields)
 }
 
 // Warn logs a warning message
-func (l *Logger) Warn(message string, fields map[string]interface{}) error {
-	return l.log(WARN, message, fields)
+func (l *Logger) Warn(identifier, message string, fields map[string]interface{}) error {
+	return l.log(WARN, identifier, message, fields)
 }
 
 // Error logs an error message
-func (l *Logger) Error(message string, fields map[string]interface{}) error {
-	return l.log(ERROR, message, fields)
+func (l *Logger) Error(identifier, message string, fields map[string]interface{}) error {
+	return l.log(ERROR, identifier, message, fields)
 }
 
 // Fatal logs a fatal message
-func (l *Logger) Fatal(message string, fields map[string]interface{}) error {
-	return l.log(FATAL, message, fields)
+func (l *Logger) Fatal(identifier, message string, fields map[string]interface{}) error {
+	return l.log(FATAL, identifier, message, fields)
 }

@@ -61,17 +61,6 @@ func main() {
 		panic(err)
 	}
 
-	// Use the logger
-	err = logger.Info("Application started", map[string]interface{}{
-		"name":    cfg.APIName,
-		"version": cfg.APIVersion,
-	})
-	if err != nil {
-		panic(err)
-	}
-
-	logger.Info("Application dummy", nil)
-
 	// Setup routes
 	setupRoutes(e, db, redisClient)
 
@@ -80,18 +69,27 @@ func main() {
 	cronService.Start()
 
 	// Start the server
-	startServer(e, cfg)
+	startServer(e, cfg, logger)
 
 }
 
 // startServer starts the Echo server on the specified port
-func startServer(e *echo.Echo, cfg *config.Config) {
+func startServer(e *echo.Echo, cfg *config.Config, logger *logger.Logger) {
 	port := cfg.ServerPort
 	if port == "" {
 		port = "3007"
 	}
+	// Database log
+	err := logger.Info("MAIN", "Server started", map[string]interface{}{
+		"name":    cfg.APIName,
+		"version": cfg.APIVersion,
+		"port":    port,
+	})
+	if err != nil {
+		panic(err)
+	}
+	// Console log
 	startupMessage := fmt.Sprintf("%s %s Server [:%s] started", cfg.APIName, cfg.APIVersion, cfg.ServerPort)
-
 	zaplogger.Info(config.SingleLine)
 	zaplogger.Info(startupMessage)
 	zaplogger.Info(config.SingleLine)

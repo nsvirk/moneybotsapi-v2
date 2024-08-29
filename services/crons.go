@@ -29,6 +29,7 @@ type CronService struct {
 	instrumentService *instrument.InstrumentService
 	tickerService     *ticker.Service
 	indexService      *instrument.IndexService
+	identifier        string
 }
 
 func NewCronService(e *echo.Echo, cfg *config.Config, db *gorm.DB, redisClient *redis.Client, logger *logger.Logger) *CronService {
@@ -49,91 +50,100 @@ func NewCronService(e *echo.Echo, cfg *config.Config, db *gorm.DB, redisClient *
 		instrumentService: instrumentService,
 		tickerService:     tickerService,
 		indexService:      indexService,
+		identifier:        "CRON SERVICE",
 	}
 }
 
 func (cs *CronService) Start() {
+	// Log the initialization to
 	zaplogger.Info(config.SingleLine)
 	zaplogger.Info("Initializing CronService")
 
 	// Add your scheduled jobs here
-	cs.addScheduledJob("API Instruments Update Job", cs.apiInstrumentsUpdateJob, "45 7 * * 1-5")       // Once at 07:45am, Mon-Fri
-	cs.addScheduledJob("Ticker Instruments Update Job", cs.tickerInstrumentsUpdateJob, "55 7 * * 1-5") // Once at 07:55am, Mon-Fri
-	// cs.addScheduledJob("Ticker Restart Job", cs.tickerRestartJob, "30 8-23 * * 1-5")                   // Every half hour from 8am to 11pm, Mon-Fri
+	cs.addScheduledJob("API Instruments UPDATE job", cs.apiInstrumentsUpdateJob, "45 7 * * 1-5")      // Once at 07:45am, Mon-Fri
+	cs.addScheduledJob("TickerInstruments UPDATE job", cs.tickerInstrumentsUpdateJob, "55 7 * * 1-5") // Once at 07:55am, Mon-Fri
 
 	// Add your startup jobs here
-	cs.addStartupJob("API Instruments Update Job", cs.apiInstrumentsUpdateJob, 1*time.Second)
-	cs.addStartupJob("Ticker Instruments Update Job", cs.tickerInstrumentsUpdateJob, 5*time.Second)
-	cs.addStartupJob("Ticker Data Truncate Job", cs.tickerDataTruncateJob, 5*time.Second)
-	cs.addStartupJob("Ticker Start Job", cs.tickerStartJob, 15*time.Second)
+	cs.addStartupJob("ApiInstruments UPDATE job", cs.apiInstrumentsUpdateJob, 1*time.Second)
+	cs.addStartupJob("TickerInstruments UPDATE job", cs.tickerInstrumentsUpdateJob, 5*time.Second)
+	cs.addStartupJob("TickerData TRUNCATE job", cs.tickerDataTruncateJob, 5*time.Second)
+	cs.addStartupJob("TickerSTART job", cs.tickerStartJob, 15*time.Second)
+
+	//
+	zaplogger.Info("  >> jobs : " + strconv.Itoa(len(cs.c.Entries())))
+
+	// Log the initialization to database
+	cs.logger.Info(cs.identifier, "Initializing CronService", map[string]interface{}{
+		"jobs": len(cs.c.Entries()),
+	})
 
 	cs.c.Start()
 }
 
 func (cs *CronService) addScheduledJob(name string, job func(), schedule string) {
 	_, err := cs.c.AddFunc(schedule, func() {
-		cs.logger.Info("Executing scheduled job", map[string]interface{}{
+		cs.logger.Info(cs.identifier, "Executing SCHEDULED job", map[string]interface{}{
 			"job":  name,
 			"time": time.Now().Format("15:04:05"),
 		})
 		zaplogger.Info("")
-		zaplogger.Info("Executing scheduled job: ")
+		zaplogger.Info("Executing SCHEDULED job: ")
 		zaplogger.Info("  >> job  : " + name)
 		zaplogger.Info("  >> time : " + time.Now().Format("15:04:05"))
 		zaplogger.Info("")
 		job()
 	})
 	if err != nil {
-		cs.logger.Error("Failed to schedule job", map[string]interface{}{
+		cs.logger.Error(cs.identifier, "Failed to SCHEDULE job", map[string]interface{}{
 			"job":   name,
 			"error": err.Error(),
 		})
 		zaplogger.Info("")
-		zaplogger.Error("Failed to schedule job")
+		zaplogger.Error("Failed to SCHEDULE job")
 		zaplogger.Error("  >> job  : " + name)
 		zaplogger.Error("  >> error: " + err.Error())
 		zaplogger.Info("")
 		return
 	}
-	zaplogger.Info("  * Scheduled job added: " + name)
+	zaplogger.Info("  * Queued SCHEDULED job: " + name)
 }
 
 func (cs *CronService) addStartupJob(name string, job func(), delay time.Duration) {
 	go func() {
 		time.Sleep(delay)
-		cs.logger.Info("Executing startup job", map[string]interface{}{
+		cs.logger.Info(cs.identifier, "Executing STARTUP job", map[string]interface{}{
 			"job":  name,
 			"time": time.Now().Format("15:04:05"),
 		})
 		zaplogger.Info("")
-		zaplogger.Info("Executing startup job: ")
+		zaplogger.Info("Executing STARTUP job: ")
 		zaplogger.Info("  >> job  : " + name)
 		zaplogger.Info("  >> time : " + time.Now().Format("15:04:05"))
 		zaplogger.Info("")
 		job()
 	}()
-	zaplogger.Info("  * Startup job queued : " + name)
+	zaplogger.Info("  * Queued STARTUP job : " + name)
 }
 
 func (cs *CronService) apiInstrumentsUpdateJob() {
 
 	totalInserted, err := cs.instrumentService.UpdateInstruments()
 	if err != nil {
-		cs.logger.Error("Failed to update instruments", map[string]interface{}{
+		cs.logger.Error(cs.identifier, "ApiInstruments UPDATE job failed", map[string]interface{}{
 			"error": err.Error(),
 		})
 		zaplogger.Info("")
-		zaplogger.Error("Failed to update instruments")
+		zaplogger.Error("ApiInstruments UPDATE job failed")
 		zaplogger.Error("  * error    : " + err.Error())
 		zaplogger.Info("")
 		return
 	}
 
-	cs.logger.Info("Instruments update successful", map[string]interface{}{
+	cs.logger.Info(cs.identifier, "ApiInstruments UPDATE job successful", map[string]interface{}{
 		"total_inserted": totalInserted,
 	})
 	zaplogger.Info("")
-	zaplogger.Info("Instruments update successful")
+	zaplogger.Info("ApiInstruments UPDATE job successful")
 	zaplogger.Info("  * total_inserted    : " + strconv.Itoa(totalInserted))
 	zaplogger.Info("")
 	zaplogger.Info(config.SingleLine)
@@ -151,21 +161,21 @@ func (cs *CronService) tickerStartJob() {
 	// Generate or fetch the session
 	sessionData, err := cs.sessionService.GenerateSession(loginRequest)
 	if err != nil {
-		cs.logger.Error("Ticker generate session failed", map[string]interface{}{
+		cs.logger.Error(cs.identifier, "TickerSession GENERATE job failed", map[string]interface{}{
 			"error": err.Error(),
 		})
 		zaplogger.Info("")
-		zaplogger.Error("Ticker generate session failed")
+		zaplogger.Error("TickerSession GENERATE job failed")
 		zaplogger.Error("  * error    : " + err.Error())
 		zaplogger.Info("")
 
 		return
 	}
-	cs.logger.Info("Ticker generate session successful", map[string]interface{}{
+	cs.logger.Info(cs.identifier, "TickerSession GENERATE job successful", map[string]interface{}{
 		"user_id":    sessionData.UserID,
 		"login_time": sessionData.LoginTime,
 	})
-	zaplogger.Info("Ticker generate session successful")
+	zaplogger.Info("TickerSession GENERATE job successful")
 	zaplogger.Info("  * user_id    : " + sessionData.UserID)
 	zaplogger.Info("  * login_time : " + sessionData.LoginTime)
 	zaplogger.Info("")
@@ -173,64 +183,66 @@ func (cs *CronService) tickerStartJob() {
 	// Start the ticker
 	err = cs.tickerService.Start(sessionData.UserID, sessionData.Enctoken)
 	if err != nil {
-		cs.logger.Error("Ticker start failed", map[string]interface{}{
+		cs.logger.Error(cs.identifier, "Ticker START job failed", map[string]interface{}{
 			"error": err.Error(),
 		})
+		//
 		zaplogger.Info("")
-		zaplogger.Error("Ticker start failed")
+		zaplogger.Error("Ticker START job failed")
 		zaplogger.Error("  * error    : " + err.Error())
 		zaplogger.Info("")
 		return
 	}
 
-	cs.logger.Info("Ticker start successful", nil)
+	cs.logger.Info(cs.identifier, "Ticker START job successful", nil)
+	//
 	zaplogger.Info("")
-	zaplogger.Info("Ticker start successful")
+	zaplogger.Info("Ticker START job successful")
 	zaplogger.Info("")
 	zaplogger.Info(config.SingleLine)
 
 }
 
 func (cs *CronService) tickerDataTruncateJob() {
-	zaplogger.Info("Starting Ticker Data Truncate Job")
+	zaplogger.Info("Starting TickerData TRUNCATE job")
 	zaplogger.Info("")
 
 	// Truncate the table
 	if err := cs.tickerService.TruncateTickerData(); err != nil {
-		cs.logger.Error("TickerData truncate Failed", map[string]interface{}{
+		cs.logger.Error(cs.identifier, "TickerData TRUNCATE job failed", map[string]interface{}{
 			"error": err.Error(),
 		})
 		zaplogger.Info("")
-		zaplogger.Error("TickerData truncate Failed")
+		zaplogger.Error("TickerData TRUNCATE job failed")
 		zaplogger.Error("  * error    : " + err.Error())
 		zaplogger.Info("")
 		return
 	}
-	cs.logger.Info("TickerData truncate successful", nil)
-	zaplogger.Info("TickerData truncate successful")
+	cs.logger.Info(cs.identifier, "TickerData TRUNCATE job successful", nil)
+	//
+	zaplogger.Info("TickerData TRUNCATE job successful")
 	zaplogger.Info("")
-
-	cs.logger.Info("Ticker Data Truncate Job Completed", nil)
-	zaplogger.Info("Ticker Data Truncate Job Completed")
 	zaplogger.Info(config.SingleLine)
 }
 
 func (cs *CronService) tickerInstrumentsUpdateJob() {
-	zaplogger.Info("Starting Ticker Instruments Update Job")
+	zaplogger.Info("Starting TickerInstruments UPDATE job")
 	zaplogger.Info("")
 
 	// Truncate the table
 	if err := cs.tickerService.TruncateTickerInstruments(); err != nil {
-		cs.logger.Error("TickerInstruments truncate Failed", map[string]interface{}{
+		cs.logger.Error(cs.identifier, "TickerInstruments TRUNCATE job failed", map[string]interface{}{
 			"error": err.Error(),
 		})
-		zaplogger.Error("TickerInstruments truncate Failed")
+		zaplogger.Error("TickerInstruments TRUNCATE job failed")
 		zaplogger.Error("  * error    : " + err.Error())
 		zaplogger.Info("")
 		return
 	}
-	cs.logger.Info("TickerInstruments truncate successful", nil)
-	zaplogger.Info("TickerInstruments truncate successful")
+	cs.logger.Info(cs.identifier, "TickerInstruments TRUNCATE job successful", nil)
+	//
+	zaplogger.Info("")
+	zaplogger.Info("TickerInstruments TRUNCATE job successful")
 	zaplogger.Info("")
 
 	m0NFO, _, _ := cs.tickerService.GetNFOFilterMonths()
@@ -284,14 +296,14 @@ func (cs *CronService) tickerInstrumentsUpdateJob() {
 	for _, q := range queries {
 		result, err := cs.tickerService.UpsertQueriedInstruments(q.exchange, q.tradingsymbol, q.expiry, q.strike, q.segment)
 		if err != nil {
-			zaplogger.Error("Failed to upsert queried instruments:")
+			zaplogger.Error("TickerInstruments UPSERT for query failed:")
 			zaplogger.Error("  * query      : " + q.description)
 			zaplogger.Error("  * error      : " + err.Error())
 			zaplogger.Info("")
 			continue
 		}
 
-		zaplogger.Info("TickerInstruments upsert results for query:")
+		zaplogger.Info("TickerInstruments UPSERT for query successful:")
 		zaplogger.Info("  * query      : " + q.description)
 		zaplogger.Info("  * queried    : " + strconv.Itoa(result["queried"].(int)))
 		zaplogger.Info("  * added      : " + strconv.Itoa(result["added"].(int)))
@@ -306,7 +318,7 @@ func (cs *CronService) tickerInstrumentsUpdateJob() {
 
 		instruments, err := cs.indexService.FetchIndexInstrumentsList(indexName)
 		if err != nil {
-			zaplogger.Error("Failed to fetch index instruments:")
+			zaplogger.Error("TickerInstruments FETCH for index failed:")
 			zaplogger.Error("  * index : " + indexName)
 			zaplogger.Error("  * error : " + err.Error())
 			zaplogger.Info("")
@@ -337,7 +349,7 @@ func (cs *CronService) tickerInstrumentsUpdateJob() {
 		}
 
 		// Log the accumulated results for the index
-		zaplogger.Info("TickerInstruments upsert results for index:")
+		zaplogger.Info("TickerInstruments UPSERT for index successful:")
 		zaplogger.Info("  * index       : " + indexName + " [INDEX]")
 		zaplogger.Info("  * instruments : " + strconv.Itoa(len(instruments)))
 		zaplogger.Info("  * queried     : " + strconv.Itoa(totalQueried))
@@ -355,6 +367,27 @@ func (cs *CronService) tickerInstrumentsUpdateJob() {
 		zaplogger.Info("")
 	}
 
-	zaplogger.Info("Ticker Instruments Update Job Completed")
+	zaplogger.Info("TickerInstruments UPDATE job successful")
 	zaplogger.Info(config.SingleLine)
+
+	// Log the ticker instrument count
+	totalTickerInstruments, err := cs.tickerService.GetTickerInstrumentCount()
+	if err != nil {
+		cs.logger.Error(cs.identifier, "TickerInstruments COUNT job failed", map[string]interface{}{
+			"error": err.Error(),
+		})
+		zaplogger.Error("TickerInstruments COUNT job failed")
+		zaplogger.Error("  * error    : " + err.Error())
+		zaplogger.Info("")
+		return
+	}
+
+	cs.logger.Info(cs.identifier, "TickerInstruments COUNT job successful", map[string]interface{}{
+		"total_ticker_instruments": totalTickerInstruments,
+	})
+	zaplogger.Info("TickerInstruments COUNT job successful")
+	zaplogger.Info("  * total_ticker_instruments    : " + strconv.Itoa(int(totalTickerInstruments)))
+	zaplogger.Info("")
+	zaplogger.Info(config.SingleLine)
+
 }
