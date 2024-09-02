@@ -28,4 +28,6 @@ go.work.sum
 .DS_Store
 .git
 Makefile
-_sql/*
+_sql
+.vscode
+_sql/*.*

@@ -32,7 +32,7 @@ func (r *Repository) TruncateTickerInstruments() error {
 // UpsertQueriedInstruments upserts instruments queried from the instrument table
 //
 //	used by cron job to keep ticker instruments updated
-func (r *Repository) UpsertQueriedInstruments(exchange, tradingsymbol, expiry, strike, segment string) (map[string]interface{}, error) {
+func (r *Repository) UpsertQueriedInstruments(userID, exchange, tradingsymbol, expiry, strike, segment string) (map[string]interface{}, error) {
 	query := r.DB.Model(&instrument.InstrumentModel{})
 
 	if exchange != "" {
@@ -67,17 +67,32 @@ func (r *Repository) UpsertQueriedInstruments(exchange, tradingsymbol, expiry, s
 		instrumentTokens[key] = uint32(instrument.InstrumentToken)
 	}
 
-	addedCount, updatedCount, err := r.upsertInstruments(instrumentTokens)
+	addedCount, updatedCount, err := r.upsertInstruments(userID, instrumentTokens)
 	if err != nil {
 		return nil, err
 	}
 
-	totalCount, err := r.GetTickerInstrumentCount()
+	// var tickerInstruments []TickerInstrument
+	// for _, instrument := range instruments {
+	// 	tickerInstruments = append(tickerInstruments, TickerInstrument{
+	// 		UserID:          userID,
+	// 		Instrument:      fmt.Sprintf("%s:%s", instrument.Exchange, instrument.Tradingsymbol),
+	// 		InstrumentToken: uint32(instrument.InstrumentToken),
+	// 		UpdatedAt:       time.Now(),
+	// 	})
+
+	// addedCount, updatedCount, err := r.UpsertTickerInstruments(userID, instrumentTokens)
+	// if err != nil {
+	// 	return nil, err
+	// }
+
+	totalCount, err := r.GetTickerInstrumentCount(userID)
 	if err != nil {
 		return nil, err
 	}
 
 	response := map[string]interface{}{
+		"user_id": userID,
 		"queried": len(instruments),
 		"added":   addedCount,
 		"updated": updatedCount,
@@ -87,15 +102,19 @@ func (r *Repository) UpsertQueriedInstruments(exchange, tradingsymbol, expiry, s
 	return response, nil
 }
 
-func (r *Repository) upsertInstruments(instrumentTokens map[string]uint32) (int, int, error) {
+func (r *Repository) upsertInstruments(userID string, instrumentTokens map[string]uint32) (int, int, error) {
 	addedCount := 0
 	updatedCount := 0
 
 	for instrument, token := range instrumentTokens {
 		result := r.DB.Clauses(clause.OnConflict{
-			Columns:   []clause.Column{{Name: "instrument_token"}},
-			DoUpdates: clause.AssignmentColumns([]string{"instrument", "updated_at"}),
+			Columns: []clause.Column{
+				{Name: "user_id"},
+				{Name: "instrument"},
+			},
+			DoUpdates: clause.AssignmentColumns([]string{"instrument_token", "updated_at"}),
 		}).Create(&TickerInstrument{
+			UserID:          userID,
 			Instrument:      instrument,
 			InstrumentToken: token,
 			UpdatedAt:       time.Now(),
@@ -115,44 +134,48 @@ func (r *Repository) upsertInstruments(instrumentTokens map[string]uint32) (int,
 	return addedCount, updatedCount, nil
 }
 
-func (r *Repository) UpsertTickerInstruments(instruments []TickerInstrument) (int, int, error) {
-	addedCount := 0
-	updatedCount := 0
+func (r *Repository) AddTickerInstruments(userID string, tickerInstruments []TickerInstrument) (int64, error) {
 
-	for _, instrument := range instruments {
+	var upsertedCount int64
+
+	for _, instrument := range tickerInstruments {
 		result := r.DB.Clauses(clause.OnConflict{
-			Columns:   []clause.Column{{Name: "instrument_token"}},
-			DoUpdates: clause.AssignmentColumns([]string{"instrument", "updated_at"}),
-		}).Create(&instrument)
+			Columns: []clause.Column{
+				{Name: "user_id"},
+				{Name: "instrument"},
+			},
+			DoUpdates: clause.AssignmentColumns([]string{"instrument_token", "updated_at"}),
+		}).Create(&TickerInstrument{
+			UserID:          userID,
+			Instrument:      instrument.Instrument,
+			InstrumentToken: instrument.InstrumentToken,
+			UpdatedAt:       time.Now(),
+		})
 
 		if result.Error != nil {
-			return addedCount, updatedCount, fmt.Errorf("error upserting instrument: %v", result.Error)
+			return upsertedCount, fmt.Errorf("error upserting instrument: %v", result.Error)
 		}
 
-		if result.RowsAffected == 1 {
-			addedCount++
-		} else {
-			updatedCount++
-		}
+		upsertedCount = result.RowsAffected
 	}
 
-	return addedCount, updatedCount, nil
+	return upsertedCount, nil
 }
 
-func (r *Repository) GetTickerInstruments() ([]TickerInstrument, error) {
-	var instruments []TickerInstrument
-	err := r.DB.Find(&instruments).Error
-	return instruments, err
+func (r *Repository) GetTickerInstruments(userID string) ([]TickerInstrument, error) {
+	var tickerInstruments []TickerInstrument
+	err := r.DB.Where("user_id = ?", userID).Find(&tickerInstruments).Error
+	return tickerInstruments, err
 }
 
-func (r *Repository) GetTickerInstrumentCount() (int64, error) {
+func (r *Repository) GetTickerInstrumentCount(userID string) (int64, error) {
 	var count int64
-	err := r.DB.Model(&TickerInstrument{}).Count(&count).Error
+	err := r.DB.Model(&TickerInstrument{}).Where("user_id = ?", userID).Count(&count).Error
 	return count, err
 }
 
-func (r *Repository) DeleteTickerInstruments(instruments []string) (int64, error) {
-	result := r.DB.Where("instrument IN ?", instruments).Delete(&TickerInstrument{})
+func (r *Repository) DeleteTickerInstruments(userID string, instruments []string) (int64, error) {
+	result := r.DB.Where("user_id = ? AND instrument IN ?", userID, instruments).Delete(&TickerInstrument{})
 	return result.RowsAffected, result.Error
 }
 

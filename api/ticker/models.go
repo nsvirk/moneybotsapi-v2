@@ -18,8 +18,9 @@ const (
 // TICKER INSTRUMENTS -------------------------------------------------
 // TickerInstrument represents the instruments for which tick data is subscribed
 type TickerInstrument struct {
-	InstrumentToken uint32    `gorm:"primaryKey"  json:"instrument_token"`
-	Instrument      string    `gorm:"uniqueIndex"  json:"instrument"`
+	UserID          string    `gorm:"uniqueIndex:idx_userId_instrument,priority:1;type:varchar(10)" json:"user_id"`
+	Instrument      string    `gorm:"uniqueIndex:idx_userId_instrument,priority:2" json:"instrument"`
+	InstrumentToken uint32    `json:"instrument_token"`
 	CreatedAt       time.Time `gorm:"autoCreateTime" json:"created_at"`
 	UpdatedAt       time.Time `gorm:"autoUpdateTime" json:"updated_at"`
 }

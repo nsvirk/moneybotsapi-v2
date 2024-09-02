@@ -54,9 +54,9 @@ func setupRoutes(e *echo.Echo, db *gorm.DB, redisClient *redis.Client) {
 	tickerHandler := ticker.NewHandler(tickerService)
 	tickerGroup := protected.Group("/ticker")
 	// tickerGroup := api.Group("/ticker") // for debugging
-	tickerGroup.GET("/instruments", tickerHandler.GetInstruments)
-	tickerGroup.POST("/instruments", tickerHandler.AddInstruments)
-	tickerGroup.DELETE("/instruments", tickerHandler.DeleteInstruments)
+	tickerGroup.GET("/instruments", tickerHandler.GetTickerInstruments)
+	tickerGroup.POST("/instruments", tickerHandler.AddTickerInstruments)
+	tickerGroup.DELETE("/instruments", tickerHandler.DeleteTickerInstruments)
 	tickerGroup.GET("/start", tickerHandler.TickerStart)
 	tickerGroup.GET("/stop", tickerHandler.TickerStop)
 	tickerGroup.GET("/restart", tickerHandler.TickerRestart)

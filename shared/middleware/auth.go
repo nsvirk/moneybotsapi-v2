@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"fmt"
 	"net/http"
 	"strings"
 
@@ -31,7 +32,22 @@ func AuthMiddleware(sessionService *session.Service) echo.MiddlewareFunc {
 			}
 
 			// Add session data to context for use in handlers
+			c.Set("userID", userSession.UserID)
+			c.Set("enctoken", userSession.Enctoken)
 			c.Set("userSession", userSession)
+
+			// Get from the context to verify that the data was set
+			userID = c.Get("userID").(string)
+			enctoken = c.Get("enctoken").(string)
+			userSession = c.Get("userSession").(*session.SessionModel)
+
+			fmt.Println("--------------------------------------------")
+			fmt.Println("Set in Context:")
+			fmt.Println("--------------------------------------------")
+			fmt.Println("userID      :", userID)
+			fmt.Println("enctoken    :", enctoken)
+			fmt.Println("loginTime   :", userSession.LoginTime)
+			fmt.Println("--------------------------------------------")
 
 			return next(c)
 		}

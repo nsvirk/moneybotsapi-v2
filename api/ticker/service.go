@@ -57,14 +57,16 @@ func (s *Service) Start(userID, enctoken string) error {
 	}
 
 	// Get all ticker instruments
-	tickerInstruments, err := s.repo.GetTickerInstruments()
+	tickerInstruments, err := s.repo.GetTickerInstruments(userID)
 	if err != nil {
 		return err
 	}
 	tickerInstrumentTokens := make([]uint32, len(tickerInstruments))
 	for i, tickerInstrument := range tickerInstruments {
-		tickerInstrumentTokens[i] = tickerInstrument.InstrumentToken
-		s.instruments[tickerInstrument.InstrumentToken] = tickerInstrument.Instrument
+		instrumentToken := tickerInstrument.InstrumentToken
+		instrument := tickerInstrument.Instrument
+		tickerInstrumentTokens[i] = instrumentToken
+		s.instruments[instrumentToken] = instrument
 	}
 
 	if len(tickerInstrumentTokens) == 0 {
@@ -289,7 +291,8 @@ func (s *Service) TruncateTickerData() error {
 	return s.repo.TruncateTickerData()
 }
 
-func (s *Service) AddTickerInstruments(instruments []string) (map[string]interface{}, error) {
+func (s *Service) AddTickerInstruments(userID string, instruments []string) (map[string]interface{}, error) {
+	// get instrument tokens for the given instruments
 	instrumentTokens, notFoundInstruments, err := s.getInstrumentTokens(instruments)
 	if err != nil {
 		return nil, err
@@ -299,28 +302,29 @@ func (s *Service) AddTickerInstruments(instruments []string) (map[string]interfa
 		return nil, fmt.Errorf("no valid instruments found")
 	}
 
+	// convert instruments and instrumeent_tokens to TickerInstrument type
 	tickerInstruments := make([]TickerInstrument, 0, len(instrumentTokens))
-	for instrument, token := range instrumentTokens {
+	for instrument, instrumentToken := range instrumentTokens {
 		tickerInstruments = append(tickerInstruments, TickerInstrument{
+			UserID:          userID,
 			Instrument:      instrument,
-			InstrumentToken: token,
+			InstrumentToken: instrumentToken,
 			UpdatedAt:       time.Now(),
 		})
 	}
 
-	addedCount, updatedCount, err := s.repo.UpsertTickerInstruments(tickerInstruments)
+	upsertedCount, err := s.repo.AddTickerInstruments(userID, tickerInstruments)
 	if err != nil {
 		return nil, err
 	}
 
-	totalCount, err := s.repo.GetTickerInstrumentCount()
+	totalCount, err := s.repo.GetTickerInstrumentCount(userID)
 	if err != nil {
 		return nil, err
 	}
 
 	response := map[string]interface{}{
-		"added":    addedCount,
-		"existing": updatedCount,
+		"upserted": upsertedCount,
 		"total":    totalCount,
 	}
 
@@ -331,16 +335,20 @@ func (s *Service) AddTickerInstruments(instruments []string) (map[string]interfa
 	return response, nil
 }
 
-func (s *Service) DeleteTickerInstruments(instruments []string) (int64, error) {
-	return s.repo.DeleteTickerInstruments(instruments)
+func (s *Service) DeleteTickerInstruments(userID string, instruments []string) (int64, error) {
+	return s.repo.DeleteTickerInstruments(userID, instruments)
 }
 
-func (s *Service) GetTickerInstruments() ([]TickerInstrument, error) {
-	return s.repo.GetTickerInstruments()
+func (s *Service) GetTickerInstruments(userID string) ([]TickerInstrument, error) {
+	return s.repo.GetTickerInstruments(userID)
 }
 
-func (s *Service) GetTickerInstrumentCount() (int64, error) {
-	return s.repo.GetTickerInstrumentCount()
+// func (s *Service) UpsertTickerInstruments(userID string, instruments []TickerInstrument) (int, int, error) {
+// 	return s.repo.UpsertTickerInstruments(userID, instruments)
+// }
+
+func (s *Service) GetTickerInstrumentCount(userID string) (int64, error) {
+	return s.repo.GetTickerInstrumentCount(userID)
 }
 
 func (s *Service) getInstrumentTokens(instruments []string) (map[string]uint32, []string, error) {
@@ -369,12 +377,8 @@ func (s *Service) TruncateTickerInstruments() error {
 	return s.repo.TruncateTickerInstruments()
 }
 
-func (s *Service) UpsertTickerInstruments(instruments []TickerInstrument) (int, int, error) {
-	return s.repo.UpsertTickerInstruments(instruments)
-}
-
-func (s *Service) UpsertQueriedInstruments(exchange, tradingsymbol, expiry, strike, segment string) (map[string]interface{}, error) {
-	return s.repo.UpsertQueriedInstruments(exchange, tradingsymbol, expiry, strike, segment)
+func (s *Service) UpsertQueriedInstruments(userID, exchange, tradingsymbol, expiry, strike, segment string) (map[string]interface{}, error) {
+	return s.repo.UpsertQueriedInstruments(userID, exchange, tradingsymbol, expiry, strike, segment)
 }
 
 func (s *Service) GetNFOFilterMonths() (string, string, string) {
