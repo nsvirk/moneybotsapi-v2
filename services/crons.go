@@ -62,17 +62,18 @@ func (cs *CronService) Start() {
 	// Add your scheduled jobs here
 	cs.addScheduledJob("API Instruments UPDATE job", cs.apiInstrumentsUpdateJob, "0 8 * * 1-5")       // Once at 08:00am, Mon-Fri
 	cs.addScheduledJob("TickerInstruments UPDATE job", cs.tickerInstrumentsUpdateJob, "30 8 * * 1-5") // Once at 08:30am, Mon-Fri
+
 	// Ticker starts at 9:00am and stops at 11:45pm - Covers NSE and MCX trading hours
-	cs.addScheduledJob("TickerSTART job", cs.tickerStartJob, "0 9 * * 1-5") // Once at 09:00am, Mon-Fri
-	cs.addScheduledJob("TickerSTOP job", cs.tickerStopJob, "45 23 * * 1-5") // Once at 11:45pm, Mon-Fri
+	cs.addScheduledJob("Ticker START job", cs.tickerStartJob, "0 9 * * 1-5") // Once at 09:00am, Mon-Fri
+	cs.addScheduledJob("Ticker STOP job", cs.tickerStopJob, "45 23 * * 1-5") // Once at 11:45pm, Mon-Fri
 
 	// Add your startup jobs here
 	cs.addStartupJob("ApiInstruments UPDATE job", cs.apiInstrumentsUpdateJob, 1*time.Second)
 	cs.addStartupJob("TickerInstruments UPDATE job", cs.tickerInstrumentsUpdateJob, 5*time.Second)
 	cs.addStartupJob("TickerData TRUNCATE job", cs.tickerDataTruncateJob, 5*time.Second)
-	// Ticker starts/stops 15/45 secs after STARTUP
-	cs.addStartupJob("TickerSTART job", cs.tickerStartJob, 15*time.Second)
-	cs.addStartupJob("TickerSTOP job", cs.tickerStopJob, 45*time.Second)
+
+	// Ticker starts/stops 15 secs after STARTUP
+	cs.addStartupJob("Ticker START job", cs.tickerStartJob, 15*time.Second)
 
 	//
 	zaplogger.Info("  >> jobs : " + strconv.Itoa(len(cs.c.Entries())))
@@ -156,31 +157,30 @@ func (cs *CronService) apiInstrumentsUpdateJob() {
 
 func (cs *CronService) tickerStartJob() {
 
-	// Create a login request
+	// Generate the session
 	loginRequest := session.LoginRequest{
 		UserID:     cs.cfg.KitetickerUserID,
 		Password:   cs.cfg.KitetickerPassword,
 		TOTPSecret: cs.cfg.KitetickerTotpSecret,
 	}
 
-	// Generate or fetch the session
 	sessionData, err := cs.sessionService.GenerateSession(loginRequest)
 	if err != nil {
-		cs.logger.Error(cs.identifier, "TickerSession GENERATE job failed", map[string]interface{}{
+		cs.logger.Error(cs.identifier, "Ticker START job failed [GenerateSession]", map[string]interface{}{
 			"error": err.Error(),
 		})
 		zaplogger.Info("")
-		zaplogger.Error("TickerSession GENERATE job failed")
+		zaplogger.Error("Ticker START job failed [GenerateSession]")
 		zaplogger.Error("  * error    : " + err.Error())
 		zaplogger.Info("")
 
 		return
 	}
-	cs.logger.Info(cs.identifier, "TickerSession GENERATE job successful", map[string]interface{}{
+	cs.logger.Info(cs.identifier, "Ticker START job successful [GenerateSession]", map[string]interface{}{
 		"user_id":    sessionData.UserID,
 		"login_time": sessionData.LoginTime,
 	})
-	zaplogger.Info("TickerSession GENERATE job successful")
+	zaplogger.Info("Ticker START job successful [GenerateSession]")
 	zaplogger.Info("  * user_id    : " + sessionData.UserID)
 	zaplogger.Info("  * login_time : " + sessionData.LoginTime)
 	zaplogger.Info("")
@@ -188,21 +188,21 @@ func (cs *CronService) tickerStartJob() {
 	// Start the ticker
 	err = cs.tickerService.Start(sessionData.UserID, sessionData.Enctoken)
 	if err != nil {
-		cs.logger.Error(cs.identifier, "Ticker START job failed", map[string]interface{}{
+		cs.logger.Error(cs.identifier, "Ticker START job failed [Ticker]", map[string]interface{}{
 			"error": err.Error(),
 		})
 		//
 		zaplogger.Info("")
-		zaplogger.Error("Ticker START job failed")
+		zaplogger.Error("Ticker START job failed [Ticker]")
 		zaplogger.Error("  * error    : " + err.Error())
 		zaplogger.Info("")
 		return
 	}
 
-	cs.logger.Info(cs.identifier, "Ticker START job successful", nil)
+	cs.logger.Info(cs.identifier, "Ticker START job successful [Ticker]", nil)
 	//
 	zaplogger.Info("")
-	zaplogger.Info("Ticker START job successful")
+	zaplogger.Info("Ticker START job successful [Ticker]")
 	zaplogger.Info("")
 	zaplogger.Info(config.SingleLine)
 
@@ -210,24 +210,25 @@ func (cs *CronService) tickerStartJob() {
 
 func (cs *CronService) tickerStopJob() {
 
-	// Start the ticker
-	err := cs.tickerService.Stop()
+	// Stop the ticker
+	userId := cs.cfg.KitetickerUserID
+	err := cs.tickerService.Stop(userId)
 	if err != nil {
-		cs.logger.Error(cs.identifier, "Ticker STOP job failed", map[string]interface{}{
+		cs.logger.Error(cs.identifier, "Ticker STOP job failed [Ticker]", map[string]interface{}{
 			"error": err.Error(),
 		})
 		//
 		zaplogger.Info("")
-		zaplogger.Error("Ticker STOP job failed")
+		zaplogger.Error("Ticker STOP job failed [Ticker]")
 		zaplogger.Error("  * error    : " + err.Error())
 		zaplogger.Info("")
 		return
 	}
 
-	cs.logger.Info(cs.identifier, "Ticker STOP job successful", nil)
+	cs.logger.Info(cs.identifier, "Ticker STOP job successful [Ticker]", nil)
 	//
 	zaplogger.Info("")
-	zaplogger.Info("Ticker STOP job successful")
+	zaplogger.Info("Ticker STOP job successful [Ticker]")
 	zaplogger.Info("")
 	zaplogger.Info(config.SingleLine)
 

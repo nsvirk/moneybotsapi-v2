@@ -45,7 +45,7 @@ func AuthMiddleware(sessionService *session.Service) echo.MiddlewareFunc {
 			fmt.Println("Set in Context:")
 			fmt.Println("--------------------------------------------")
 			fmt.Println("userID      :", userID)
-			fmt.Println("enctoken    :", enctoken)
+			fmt.Println("enctoken    :", "********")
 			fmt.Println("loginTime   :", userSession.LoginTime)
 			fmt.Println("--------------------------------------------")
 

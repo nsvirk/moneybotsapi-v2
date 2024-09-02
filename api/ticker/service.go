@@ -15,6 +15,10 @@ import (
 	"gorm.io/gorm"
 )
 
+// Kiteticker
+const tickerReconnectMaxRetries = 10 // 10 retries
+
+// TickerService
 const (
 	batchSize                       = 1000
 	flushInterval                   = 100 * time.Microsecond
@@ -52,8 +56,10 @@ func (s *Service) Start(userID, enctoken string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	// Stop the ticker if already runnin
 	if s.isRunning {
-		return fmt.Errorf("ticker is already running")
+		s.Stop(userID)
+		// return fmt.Errorf("ticker is already running")
 	}
 
 	// Get all ticker instruments
@@ -98,7 +104,7 @@ func (s *Service) Start(userID, enctoken string) error {
 	return nil
 }
 
-func (s *Service) Stop() error {
+func (s *Service) Stop(userID string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -106,22 +112,36 @@ func (s *Service) Stop() error {
 		return fmt.Errorf("ticker is not running")
 	}
 
-	s.ticker.Close()
-	// wait one seconds for the ticker to close
+	// Get all ticker instruments
+	tickerInstruments, err := s.repo.GetTickerInstruments(userID)
+	if err != nil {
+		return err
+	}
+	tickerInstrumentTokens := make([]uint32, len(tickerInstruments))
+	for i, tickerInstrument := range tickerInstruments {
+		instrumentToken := tickerInstrument.InstrumentToken
+		instrument := tickerInstrument.Instrument
+		tickerInstrumentTokens[i] = instrumentToken
+		s.instruments[instrumentToken] = instrument
+	}
+
+	// Unsubscribe from instruments
+	s.ticker.Unsubscribe(tickerInstrumentTokens)
 	time.Sleep(1 * time.Second)
+
+	// Stop the ticker
+	s.ticker.Close()
 	s.ticker.Stop()
 	s.ticker = nil
 	s.isRunning = false
-	s.cancel()
+
+	// s.cancel() // if this is enable then the ticker doesnt run on next start
 
 	s.repo.Info("Stop", "Ticker stopped successfully")
 	return nil
 }
 
 func (s *Service) Restart(userID, enctoken string) error {
-	if err := s.Stop(); err != nil {
-		return err
-	}
 	return s.Start(userID, enctoken)
 }
 
@@ -132,6 +152,8 @@ func (s *Service) Status() bool {
 
 func (s *Service) initializeTicker(userID, enctoken string) error {
 	s.ticker = kiteticker.New(userID, enctoken)
+
+	s.SetReconnectMaxRetries(tickerReconnectMaxRetries)
 	s.setupTickerCallbacks()
 
 	go s.ticker.Serve()
@@ -150,6 +172,9 @@ func (s *Service) initializeTicker(userID, enctoken string) error {
 			return fmt.Errorf("timeout waiting for ticker connection")
 		}
 	}
+}
+func (s *Service) SetReconnectMaxRetries(retries int) {
+	s.ticker.SetReconnectMaxRetries(retries)
 }
 
 func (s *Service) setupTickerCallbacks() {

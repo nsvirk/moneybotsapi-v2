@@ -41,7 +41,12 @@ func (h *Handler) TickerStart(c echo.Context) error {
 }
 
 func (h *Handler) TickerStop(c echo.Context) error {
-	if err := h.service.Stop(); err != nil {
+	userID, _, err := extractAuthInfo(c)
+	if err != nil {
+		return err
+	}
+
+	if err := h.service.Stop(userID); err != nil {
 		return response.ErrorResponse(c, http.StatusBadRequest, "InputException", err.Error())
 	}
 
