@@ -4,7 +4,7 @@ import (
 	"time"
 )
 
-const SessionsTableName = "api_sessions"
+const SessionsTableName = "sessions"
 
 type SessionModel struct {
 	UserID         string    `gorm:"primaryKey;uniqueIndex" json:"user_id"`

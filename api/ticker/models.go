@@ -10,9 +10,9 @@ import (
 )
 
 const (
-	TickerInstrumentsTableName = "api_ticker_instruments"
-	TickerDataTableName        = "api_ticker_data"
-	TickerLogTableName         = "api_ticker_logs"
+	TickerInstrumentsTableName = "ticker_instruments"
+	TickerDataTableName        = "ticker_data"
+	TickerLogTableName         = "ticker_logs"
 )
 
 // TICKER INSTRUMENTS -------------------------------------------------

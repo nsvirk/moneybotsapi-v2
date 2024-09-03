@@ -5,7 +5,7 @@ package instrument
 import "time"
 
 // TableName is the name of the table for instruments
-var InstrumentsTableName = "api_instruments"
+var InstrumentsTableName = "instruments"
 
 // Instrument represents a trading instrument
 type InstrumentModel struct {

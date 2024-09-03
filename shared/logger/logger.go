@@ -31,7 +31,7 @@ type APILog struct {
 
 // TableName overrides the table name used by APILog
 func (APILog) TableName() string {
-	return "api_logs"
+	return "logs"
 }
 
 // Logger is the main struct for the dblogger
