@@ -67,7 +67,7 @@ func ConnectPostgres(cfg *config.Config) (*gorm.DB, error) {
 	if err != nil {
 		return nil, err
 	}
-	zaplogger.Info("  * ticker data table set as unlogged")
+	zaplogger.Info("  * table " + ticker.TickerDataTableName + " set as unlogged")
 
 	return db, nil
 }
@@ -98,9 +98,8 @@ func autoMigrate(db *gorm.DB) error {
 
 func setTickerDataTableAsUnlogged(db *gorm.DB) error {
 	// Set the table as unlogged
-	schema := "api"
 	table := ticker.TickerDataTableName
-	if err := db.Table(schema + "." + table).Exec("ALTER TABLE " + table + " SET UNLOGGED").Error; err != nil {
+	if err := db.Table(SchemaName + "." + table).Exec("ALTER TABLE " + table + " SET UNLOGGED").Error; err != nil {
 		return fmt.Errorf("failed to set table as unlogged: %v", err)
 	}
 
