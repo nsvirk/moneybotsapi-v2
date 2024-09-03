@@ -15,6 +15,9 @@ import (
 	"gorm.io/gorm/logger"
 )
 
+// TableName is the name of the table for instruments
+var SchemaName = "api"
+
 // ConnectPostgres connects to a Postgres database and returns a GORM database object
 func ConnectPostgres(cfg *config.Config) (*gorm.DB, error) {
 	zaplogger.Info(config.SingleLine)
@@ -44,17 +47,19 @@ func ConnectPostgres(cfg *config.Config) (*gorm.DB, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to Postgres: %v", err)
 	}
+
 	zaplogger.Info("  * connected")
-	zaplogger.Info("  * checking tables")
+
+	// Create the schema if it doesn't exist
+	createSchemaSql := fmt.Sprintf("CREATE SCHEMA IF NOT EXISTS %s", SchemaName)
+	if err := db.Exec(createSchemaSql).Error; err != nil {
+		panic("failed to create schema: " + err.Error())
+	}
+	zaplogger.Info("  * migrating scheme: \"" + SchemaName + "\"")
 
 	// AutoMigrate will create tables and add/modify columns
 	if err := autoMigrate(db); err != nil {
 		return nil, fmt.Errorf("failed to auto migrate: %v", err)
-	}
-
-	// Verify that the tables are created
-	if err := verifyTables(db); err != nil {
-		return nil, err
 	}
 
 	// Set the ticker data table as unlogged
@@ -68,16 +73,6 @@ func ConnectPostgres(cfg *config.Config) (*gorm.DB, error) {
 }
 
 func autoMigrate(db *gorm.DB) error {
-	return db.AutoMigrate(
-		&session.SessionModel{},
-		&instrument.InstrumentModel{},
-		&ticker.TickerInstrument{},
-		&ticker.TickerLog{},
-		&ticker.TickerData{},
-	)
-}
-
-func verifyTables(db *gorm.DB) error {
 	tables := []struct {
 		name  string
 		model interface{}
@@ -89,12 +84,13 @@ func verifyTables(db *gorm.DB) error {
 		{ticker.TickerDataTableName, &ticker.TickerData{}},
 	}
 
+	zaplogger.Info("  * migrating tables")
 	for _, table := range tables {
-		if db.Migrator().HasTable(table.model) {
-			zaplogger.Info("    - " + table.name + " \u2714")
-		} else {
-			return fmt.Errorf("failed to create table: " + table.name)
+		err := db.Table(SchemaName + "." + table.name).AutoMigrate(&table.model)
+		if err != nil {
+			return fmt.Errorf("failed to auto migrate table: %s, err:%v", table.name, err)
 		}
+		zaplogger.Info("    - \"" + SchemaName + "." + table.name + "\"")
 	}
 
 	return nil
@@ -102,7 +98,9 @@ func verifyTables(db *gorm.DB) error {
 
 func setTickerDataTableAsUnlogged(db *gorm.DB) error {
 	// Set the table as unlogged
-	if err := db.Exec("ALTER TABLE " + ticker.TickerDataTableName + " SET UNLOGGED").Error; err != nil {
+	schema := "api"
+	table := ticker.TickerDataTableName
+	if err := db.Table(schema + "." + table).Exec("ALTER TABLE " + table + " SET UNLOGGED").Error; err != nil {
 		return fmt.Errorf("failed to set table as unlogged: %v", err)
 	}
 
