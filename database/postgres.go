@@ -43,7 +43,8 @@ func ConnectPostgres(cfg *config.Config) (*gorm.DB, error) {
 	}
 
 	// Open database connection
-	db, err := gorm.Open(postgres.Open(cfg.PostgresDsn), gormConfig)
+	postgresDSN := cfg.PostgresDsn + " search_path=api,public"
+	db, err := gorm.Open(postgres.Open(postgresDSN), gormConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to Postgres: %v", err)
 	}
