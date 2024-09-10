@@ -93,19 +93,7 @@ func (h *Handler) QueryInstruments(c echo.Context) error {
 	}
 
 	if detailsBool {
-		instrumentMap := make(map[string]interface{})
-		for _, inst := range instruments {
-			symbol := fmt.Sprintf("%s:%s", inst.Exchange, inst.Tradingsymbol)
-			instrumentMap[symbol] = map[string]interface{}{
-				"exchange":         inst.Exchange,
-				"expiry":           inst.Expiry,
-				"instrument_token": inst.InstrumentToken,
-				"strike":           inst.Strike,
-				"segment":          inst.Segment,
-				"tradingsymbol":    inst.Tradingsymbol,
-			}
-		}
-		return response.SuccessResponse(c, instrumentMap)
+		return response.SuccessResponse(c, instruments)
 	} else {
 		instrumentsList := make([]string, len(instruments))
 		for i, inst := range instruments {
@@ -152,4 +140,39 @@ func (h *Handler) GetInstrumentTokens(c echo.Context) error {
 	}
 
 	return response.SuccessResponse(c, instrumentMap)
+}
+
+func (h *Handler) GetOptionChainInstruments(c echo.Context) error {
+	expiry := c.QueryParam("expiry")
+	details := c.QueryParam("details")
+
+	if len(expiry) == 0 {
+		return response.ErrorResponse(c, http.StatusBadRequest, "invalid_request", "No `expiry` provided")
+	}
+
+	detailsBool, err := strconv.ParseBool(details)
+	if details != "" {
+		if err != nil {
+			return response.ErrorResponse(c, http.StatusBadRequest, "invalid_request", "Invalid `details` value")
+		}
+	}
+
+	instrumentsMap, err := h.InstrumentService.GetOptionChainInstruments(expiry)
+	if err != nil {
+		return response.ErrorResponse(c, http.StatusInternalServerError, "query_error", err.Error())
+	}
+
+	if detailsBool {
+		return response.SuccessResponse(c, instrumentsMap)
+
+	} else {
+		instrumentsMapList := make(map[string][]string, 0)
+		for name, instruments := range instrumentsMap {
+			for _, instrument := range instruments {
+				instrumentsMapList[name] = append(instrumentsMapList[name], fmt.Sprintf("%s:%s", instrument.Exchange, instrument.Tradingsymbol))
+			}
+		}
+		return response.SuccessResponse(c, instrumentsMapList)
+	}
+
 }

@@ -105,3 +105,24 @@ func (s *InstrumentService) GetInstrumentTokens(instruments []string) (map[strin
 func (s *InstrumentService) QueryInstruments(exchange, tradingsymbol, expiry, strike, segment string) ([]InstrumentModel, error) {
 	return s.repo.QueryInstruments(exchange, tradingsymbol, expiry, strike, segment)
 }
+
+func (s *InstrumentService) GetOptionChainInstruments(expiry string) (map[string][]InstrumentModel, error) {
+	instrumentMap := make(map[string][]InstrumentModel)
+
+	names, err := s.repo.GetOptionChainInstrumentNamesForExpiry(expiry)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, name := range names {
+		instruments, err := s.repo.GetOptionChainInstrumentsForNameExpiry(name, expiry)
+		if err != nil {
+			return nil, err
+		}
+
+		instrumentMap[name] = instruments
+	}
+
+	return instrumentMap, nil
+
+}
