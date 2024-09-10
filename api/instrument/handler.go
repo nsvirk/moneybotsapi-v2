@@ -5,6 +5,7 @@ package instrument
 import (
 	"fmt"
 	"net/http"
+	"regexp"
 	"strconv"
 	"time"
 
@@ -80,6 +81,29 @@ func (h *Handler) QueryInstruments(c echo.Context) error {
 	segment := c.QueryParam("segment")
 	details := c.QueryParam("details")
 
+	// check if exchange is only alphabets
+	if !regexp.MustCompile(`^[A-Za-z]+$`).MatchString(exchange) {
+		return response.ErrorResponse(c, http.StatusBadRequest, "invalid_request", "Invalid `exchange` format")
+	}
+
+	// check if tradingsymbol is only alphanumeric plus % and _
+	if !regexp.MustCompile(`^[A-Za-z0-9%_]+$`).MatchString(tradingsymbol) {
+		return response.ErrorResponse(c, http.StatusBadRequest, "invalid_request", "Invalid `tradingsymbol` format")
+	}
+
+	// check if expiry is valid date
+	_, err := time.Parse("2006-01-02", expiry)
+	if err != nil {
+		return response.ErrorResponse(c, http.StatusBadRequest, "invalid_request", "Invalid `expiry` format")
+	}
+
+	// check if strike is just digits if not blank
+	if strike != "" {
+		if !regexp.MustCompile(`^\d+$`).MatchString(strike) {
+			return response.ErrorResponse(c, http.StatusBadRequest, "invalid_request", "Invalid `strike` format")
+		}
+	}
+
 	detailsBool, err := strconv.ParseBool(details)
 	if details != "" {
 		if err != nil {
@@ -107,7 +131,7 @@ func (h *Handler) GetInstrumentSymbols(c echo.Context) error {
 	tokenParams := c.QueryParams()["t"]
 
 	if len(tokenParams) == 0 {
-		return response.ErrorResponse(c, http.StatusBadRequest, "invalid_request", "No instrument tokens provided")
+		return response.ErrorResponse(c, http.StatusBadRequest, "invalid_request", "Input `t` is required")
 	}
 
 	var tokens []uint
@@ -142,12 +166,42 @@ func (h *Handler) GetInstrumentTokens(c echo.Context) error {
 	return response.SuccessResponse(c, instrumentMap)
 }
 
+func (h *Handler) GetOptionChainNames(c echo.Context) error {
+	expiry := c.QueryParam("expiry")
+	if len(expiry) == 0 {
+		return response.ErrorResponse(c, http.StatusBadRequest, "invalid_request", "No `expiry` provided")
+	}
+
+	// check if expiry is valid date
+	_, err := time.Parse("2006-01-02", expiry)
+	if err != nil {
+		return response.ErrorResponse(c, http.StatusBadRequest, "invalid_request", "Invalid `expiry` format")
+	}
+
+	names, err := h.InstrumentService.GetOptionChainNames(expiry)
+	if err != nil {
+		return response.ErrorResponse(c, http.StatusInternalServerError, "query_error", err.Error())
+	}
+
+	return response.SuccessResponse(c, names)
+}
+
 func (h *Handler) GetOptionChainInstruments(c echo.Context) error {
+	name := c.QueryParam("name")
 	expiry := c.QueryParam("expiry")
 	details := c.QueryParam("details")
 
+	if len(name) == 0 {
+		return response.ErrorResponse(c, http.StatusBadRequest, "invalid_request", "Input `name` is required")
+	}
+
 	if len(expiry) == 0 {
 		return response.ErrorResponse(c, http.StatusBadRequest, "invalid_request", "No `expiry` provided")
+	}
+	// check if expiry is valid date
+	_, err := time.Parse("2006-01-02", expiry)
+	if err != nil {
+		return response.ErrorResponse(c, http.StatusBadRequest, "invalid_request", "Invalid `expiry` format")
 	}
 
 	detailsBool, err := strconv.ParseBool(details)
@@ -157,7 +211,7 @@ func (h *Handler) GetOptionChainInstruments(c echo.Context) error {
 		}
 	}
 
-	instrumentsMap, err := h.InstrumentService.GetOptionChainInstruments(expiry)
+	instrumentsMap, err := h.InstrumentService.GetOptionChainInstruments(name, expiry)
 	if err != nil {
 		return response.ErrorResponse(c, http.StatusInternalServerError, "query_error", err.Error())
 	}

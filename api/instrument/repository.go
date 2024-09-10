@@ -115,14 +115,14 @@ func (r *Repository) GetInstrumentBySymbol(exchange, tradingsymbol string) (Inst
 	return instrument, err
 }
 
-func (r *Repository) GetOptionChainInstrumentNamesForExpiry(expiry string) ([]string, error) {
+func (r *Repository) GetInstrumentNamesForExpiry(expiry string) ([]string, error) {
 	var names []string
-	err := r.DB.Raw("SELECT DISTINCT name FROM api.get_option_chain_instruments_for_date(?)", expiry).Scan(&names).Error
+	err := r.DB.Raw("SELECT DISTINCT name FROM api.instruments WHERE expiry = ?", expiry).Scan(&names).Error
 	return names, err
 }
 
 func (r *Repository) GetOptionChainInstrumentsForNameExpiry(name, expiry string) ([]InstrumentModel, error) {
 	var instruments []InstrumentModel
-	err := r.DB.Raw("SELECT * FROM api.get_option_chain_instruments_for_date(?) WHERE name = ? ORDER BY strike ASC", expiry, name).Scan(&instruments).Error
+	err := r.DB.Raw("SELECT * FROM api.get_optionchain_instruments_for_name_date(?, ?) ORDER BY strike ASC", name, expiry).Scan(&instruments).Error
 	return instruments, err
 }

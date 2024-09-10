@@ -47,7 +47,8 @@ func setupRoutes(e *echo.Echo, db *gorm.DB, redisClient *redis.Client) {
 	instrumentGroup.GET("/indices", instrumentHandler.GetIndicesInstruments)
 	instrumentGroup.GET("/tokens", instrumentHandler.GetInstrumentTokens)
 	instrumentGroup.GET("/symbols", instrumentHandler.GetInstrumentSymbols)
-	instrumentGroup.GET("/optionchain", instrumentHandler.GetOptionChainInstruments)
+	instrumentGroup.GET("/optionchain/names", instrumentHandler.GetOptionChainNames)
+	instrumentGroup.GET("/optionchain/instruments", instrumentHandler.GetOptionChainInstruments)
 
 	// Ticker routes (protected)
 	// Initialize ticker components
