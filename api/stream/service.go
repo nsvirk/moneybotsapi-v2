@@ -102,6 +102,16 @@ func (s *Service) RunTickerStream(ctx context.Context, c echo.Context, userId, e
 	c.Response().Header().Set(echo.HeaderConnection, "keep-alive")
 	c.Response().WriteHeader(http.StatusOK)
 
+	// Send an initial message to establish the connection
+	if _, err := c.Response().Write([]byte("data: connected\n\n")); err != nil {
+		log.Printf("Error writing initial message: %v", err)
+		return
+	}
+	c.Response().Flush()
+
+	ticker := time.NewTicker(30 * time.Second)
+	defer ticker.Stop()
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -109,6 +119,13 @@ func (s *Service) RunTickerStream(ctx context.Context, c echo.Context, userId, e
 		case data := <-clientChan:
 			if _, err := c.Response().Write(data); err != nil {
 				log.Printf("Error writing to client %s: %v", clientID, err)
+				return
+			}
+			c.Response().Flush()
+		case <-ticker.C:
+			// Send a keep-alive message every 30 seconds
+			if _, err := c.Response().Write([]byte(": keep-alive\n\n")); err != nil {
+				log.Printf("Error writing keep-alive: %v", err)
 				return
 			}
 			c.Response().Flush()
