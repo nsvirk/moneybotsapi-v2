@@ -9,6 +9,7 @@ import (
 	"github.com/nsvirk/moneybotsapi/api/instrument"
 	"github.com/nsvirk/moneybotsapi/api/quote"
 	"github.com/nsvirk/moneybotsapi/api/session"
+	"github.com/nsvirk/moneybotsapi/api/stream"
 	"github.com/nsvirk/moneybotsapi/api/ticker"
 	"github.com/nsvirk/moneybotsapi/config"
 	"github.com/nsvirk/moneybotsapi/shared/middleware"
@@ -44,11 +45,12 @@ func setupRoutes(e *echo.Echo, db *gorm.DB, redisClient *redis.Client) {
 	// instrumentGroup := api.Group("/instrument") // for debugging
 	instrumentGroup.POST("/update", instrumentHandler.UpdateInstruments)
 	instrumentGroup.GET("/query", instrumentHandler.QueryInstruments)
-	instrumentGroup.GET("/indices", instrumentHandler.GetIndicesInstruments)
+	instrumentGroup.GET("/index/names", instrumentHandler.GetIndexNames)
+	instrumentGroup.GET("/index", instrumentHandler.GetIndexInstruments)
 	instrumentGroup.GET("/tokens", instrumentHandler.GetInstrumentTokens)
 	instrumentGroup.GET("/symbols", instrumentHandler.GetInstrumentSymbols)
 	instrumentGroup.GET("/optionchain/names", instrumentHandler.GetOptionChainNames)
-	instrumentGroup.GET("/optionchain/instruments", instrumentHandler.GetOptionChainInstruments)
+	instrumentGroup.GET("/optionchain", instrumentHandler.GetOptionChainInstruments)
 
 	// Ticker routes (protected)
 	// Initialize ticker components
@@ -72,6 +74,11 @@ func setupRoutes(e *echo.Echo, db *gorm.DB, redisClient *redis.Client) {
 	quoteGroup.GET("", quoteHandler.GetQuote)
 	quoteGroup.GET("/ohlc", quoteHandler.GetOHLC)
 	quoteGroup.GET("/ltp", quoteHandler.GetLTP)
+
+	// Stream routes (protected)
+	streamHandler := stream.NewHandler(db)
+	streamGroup := protected.Group("/stream")
+	streamGroup.POST("/ticks", streamHandler.StreamTickerData)
 
 }
 
