@@ -25,9 +25,12 @@ go.work.sum
 .env
 
 # Custom
-.DS_Store
 .git
+.vscode
+.DS_Store
 Makefile
 _sql
-.vscode
-_sql/*.*
+_dep
+static
+
+

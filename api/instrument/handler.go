@@ -47,7 +47,7 @@ func (h *Handler) UpdateInstruments(c echo.Context) error {
 	return response.SuccessResponse(c, responseData)
 }
 
-func (h *Handler) GetIndicesInstruments(c echo.Context) error {
+func (h *Handler) GetIndexInstruments(c echo.Context) error {
 	indices := c.QueryParams()["i"]
 
 	if len(indices) == 0 {
@@ -57,7 +57,7 @@ func (h *Handler) GetIndicesInstruments(c echo.Context) error {
 	responseData := make(map[string][]string)
 
 	for _, indexName := range indices {
-		instruments, err := h.IndexService.FetchIndexInstrumentsList(indexName)
+		instruments, err := h.IndexService.GetIndexInstruments(indexName)
 		if err != nil {
 			return response.ErrorResponse(c, http.StatusInternalServerError, "fetch_error", fmt.Sprintf("Error fetching instruments for index %s: %v", indexName, err))
 		}
@@ -68,8 +68,8 @@ func (h *Handler) GetIndicesInstruments(c echo.Context) error {
 	return response.SuccessResponse(c, responseData)
 }
 
-func (h *Handler) GetAvailableIndices(c echo.Context) error {
-	indices := h.IndexService.GetAvailableIndices()
+func (h *Handler) GetIndexNames(c echo.Context) error {
+	indices := h.IndexService.GetIndexNames()
 	return response.SuccessResponse(c, indices)
 }
 
@@ -91,10 +91,12 @@ func (h *Handler) QueryInstruments(c echo.Context) error {
 		return response.ErrorResponse(c, http.StatusBadRequest, "invalid_request", "Invalid `tradingsymbol` format")
 	}
 
-	// check if expiry is valid date
-	_, err := time.Parse("2006-01-02", expiry)
-	if err != nil {
-		return response.ErrorResponse(c, http.StatusBadRequest, "invalid_request", "Invalid `expiry` format")
+	// check if expiry is valid date if not blank
+	if expiry != "" {
+		_, err := time.Parse("2006-01-02", expiry)
+		if err != nil {
+			return response.ErrorResponse(c, http.StatusBadRequest, "invalid_request", "Invalid `expiry` format")
+		}
 	}
 
 	// check if strike is just digits if not blank
@@ -134,13 +136,13 @@ func (h *Handler) GetInstrumentSymbols(c echo.Context) error {
 		return response.ErrorResponse(c, http.StatusBadRequest, "invalid_request", "Input `t` is required")
 	}
 
-	var tokens []uint
+	var tokens []uint32
 	for _, tokenStr := range tokenParams {
 		token, err := strconv.ParseUint(tokenStr, 10, 32)
 		if err != nil {
 			return response.ErrorResponse(c, http.StatusBadRequest, "invalid_token", "Invalid instrument token format")
 		}
-		tokens = append(tokens, uint(token))
+		tokens = append(tokens, uint32(token))
 	}
 
 	instrumentMap, err := h.InstrumentService.GetInstrumentSymbols(tokens)
@@ -158,7 +160,7 @@ func (h *Handler) GetInstrumentTokens(c echo.Context) error {
 		return response.ErrorResponse(c, http.StatusBadRequest, "invalid_request", "No instruments provided")
 	}
 
-	instrumentMap, err := h.InstrumentService.GetInstrumentTokens(instruments)
+	instrumentMap, err := h.InstrumentService.GetInstrumentToTokenMap(instruments)
 	if err != nil {
 		return response.ErrorResponse(c, http.StatusInternalServerError, "query_error", err.Error())
 	}

@@ -55,7 +55,7 @@ func NewCronService(e *echo.Echo, cfg *config.Config, db *gorm.DB, redisClient *
 }
 
 func (cs *CronService) Start() {
-	// Log the initialization to
+	// Log the initialization to logger
 	zaplogger.Info(config.SingleLine)
 	zaplogger.Info("Initializing CronService")
 
@@ -72,10 +72,10 @@ func (cs *CronService) Start() {
 	cs.addStartupJob("TickerInstruments UPDATE job", cs.tickerInstrumentsUpdateJob, 5*time.Second)
 	cs.addStartupJob("TickerData TRUNCATE job", cs.tickerDataTruncateJob, 5*time.Second)
 
-	// Ticker starts/stops 15 secs after STARTUP
+	// Ticker starts 15 secs after STARTUP
 	cs.addStartupJob("Ticker START job", cs.tickerStartJob, 15*time.Second)
 
-	//
+	// Log the number of jobs
 	zaplogger.Info("  >> jobs : " + strconv.Itoa(len(cs.c.Entries())))
 
 	// Log the initialization to database
@@ -350,7 +350,7 @@ func (cs *CronService) tickerInstrumentsUpdateJob() {
 	indices := []string{"NSE:NIFTY 500", "NSE:NIFTY BANK"}
 	for _, indexName := range indices {
 
-		instruments, err := cs.indexService.FetchIndexInstrumentsList(indexName)
+		instruments, err := cs.indexService.GetIndexInstruments(indexName)
 		if err != nil {
 			zaplogger.Error("TickerInstruments FETCH for index failed:")
 			zaplogger.Error("  * index : " + indexName)

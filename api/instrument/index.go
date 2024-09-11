@@ -35,7 +35,7 @@ func NewIndexService() *IndexService {
 	}
 }
 
-func (s *IndexService) FetchIndexInstrumentsList(indexName string) ([]string, error) {
+func (s *IndexService) GetIndexInstruments(indexName string) ([]string, error) {
 	url, ok := IndexURLMap[indexName]
 	if !ok {
 		return nil, fmt.Errorf("invalid index: %s", indexName)
@@ -61,7 +61,7 @@ func (s *IndexService) FetchIndexInstrumentsList(indexName string) ([]string, er
 	return symbols, nil
 }
 
-func (s *IndexService) GetAvailableIndices() []string {
+func (s *IndexService) GetIndexNames() []string {
 	indices := make([]string, 0, len(IndexURLMap))
 	for index := range IndexURLMap {
 		indices = append(indices, index)

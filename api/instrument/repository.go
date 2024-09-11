@@ -101,7 +101,7 @@ func (r *Repository) QueryInstruments(exchange, tradingsymbol, expiry, strike, s
 	return instruments, nil
 }
 
-func (r *Repository) GetInstrumentSymbols(tokens []uint) ([]InstrumentModel, error) {
+func (r *Repository) GetInstrumentsByTokens(tokens []uint32) ([]InstrumentModel, error) {
 	var instruments []InstrumentModel
 	if err := r.DB.Where("instrument_token IN ?", tokens).Find(&instruments).Error; err != nil {
 		return nil, err
@@ -109,7 +109,7 @@ func (r *Repository) GetInstrumentSymbols(tokens []uint) ([]InstrumentModel, err
 	return instruments, nil
 }
 
-func (r *Repository) GetInstrumentBySymbol(exchange, tradingsymbol string) (InstrumentModel, error) {
+func (r *Repository) GetInstrumentByExchangeTradingsymbol(exchange, tradingsymbol string) (InstrumentModel, error) {
 	var instrument InstrumentModel
 	err := r.DB.Where("exchange = ? AND tradingsymbol = ?", exchange, tradingsymbol).First(&instrument).Error
 	return instrument, err

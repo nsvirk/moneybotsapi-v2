@@ -61,8 +61,8 @@ func (s *InstrumentService) UpdateInstruments() (int, error) {
 	return totalInserted, nil
 }
 
-func (s *InstrumentService) GetInstrumentSymbols(tokens []uint) (map[string]string, error) {
-	instruments, err := s.repo.GetInstrumentSymbols(tokens)
+func (s *InstrumentService) GetInstrumentSymbols(tokens []uint32) (map[string]string, error) {
+	instruments, err := s.repo.GetInstrumentsByTokens(tokens)
 	if err != nil {
 		return nil, err
 	}
@@ -76,8 +76,8 @@ func (s *InstrumentService) GetInstrumentSymbols(tokens []uint) (map[string]stri
 	return instrumentMap, nil
 }
 
-func (s *InstrumentService) GetInstrumentTokens(instruments []string) (map[string]string, error) {
-	instrumentMap := make(map[string]string)
+func (s *InstrumentService) GetInstrumentToTokenMap(instruments []string) (map[string]uint32, error) {
+	instrumentMap := make(map[string]uint32)
 	for _, symbol := range instruments {
 		parts := strings.Split(strings.TrimSpace(symbol), ":")
 		if len(parts) != 2 {
@@ -87,7 +87,7 @@ func (s *InstrumentService) GetInstrumentTokens(instruments []string) (map[strin
 		exchange := strings.TrimSpace(parts[0])
 		tradingsymbol := strings.TrimSpace(parts[1])
 
-		instrument, err := s.repo.GetInstrumentBySymbol(exchange, tradingsymbol)
+		instrument, err := s.repo.GetInstrumentByExchangeTradingsymbol(exchange, tradingsymbol)
 		if err != nil {
 			if err == gorm.ErrRecordNotFound {
 				// Skip instruments that are not found
@@ -95,8 +95,7 @@ func (s *InstrumentService) GetInstrumentTokens(instruments []string) (map[strin
 			}
 			return nil, err
 		}
-		tokenStr := strconv.FormatUint(uint64(instrument.InstrumentToken), 10)
-		instrumentMap[symbol] = tokenStr
+		instrumentMap[symbol] = instrument.InstrumentToken
 	}
 
 	return instrumentMap, nil
