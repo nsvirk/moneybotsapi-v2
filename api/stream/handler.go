@@ -1,7 +1,6 @@
 package stream
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 	"strings"
@@ -36,15 +35,7 @@ func (h *Handler) StreamTickerData(c echo.Context) error {
 		return response.ErrorResponse(c, http.StatusBadRequest, "InputException", "Invalid request body")
 	}
 
-	// Set headers for SSE
-	c.Response().Header().Set(echo.HeaderContentType, "text/event-stream")
-	c.Response().Header().Set(echo.HeaderCacheControl, "no-cache")
-	c.Response().Header().Set(echo.HeaderConnection, "keep-alive")
-	c.Response().WriteHeader(http.StatusOK)
-
-	ctx, cancel := context.WithCancel(c.Request().Context())
-	defer cancel()
-
+	ctx := c.Request().Context()
 	errChan := make(chan error, 1)
 
 	go h.service.RunTickerStream(ctx, c, userId, enctoken, req.Instruments, errChan)
@@ -54,8 +45,6 @@ func (h *Handler) StreamTickerData(c echo.Context) error {
 		return nil
 	case err := <-errChan:
 		return response.ErrorResponse(c, http.StatusInternalServerError, "ServerError", fmt.Sprintf("Ticker error: %v", err))
-	case <-c.Request().Context().Done():
-		return nil
 	}
 }
 

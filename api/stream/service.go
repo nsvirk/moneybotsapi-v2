@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"net/http"
 	"strings"
 	"sync"
 	"time"
@@ -18,52 +19,164 @@ import (
 type Service struct {
 	instrumentService *instrument.InstrumentService
 	ticker            *kiteticker.Ticker
-	mu                sync.Mutex
-	tokenMap          map[uint32]string
-	tokens            []uint32
-	clientClosed      chan struct{}
+	globalTokenMap    map[uint32]string
+	mu                sync.RWMutex
+	clients           map[string]*Client
+	isConnected       bool
+	connectChan       chan struct{}
+	subscriptionChan  chan subscriptionRequest
+}
+
+type Client struct {
+	ID          string
+	Instruments []string
+	Tokens      []uint32
+	TokenMap    map[uint32]string
+	Channel     chan<- []byte
+}
+
+type subscriptionRequest struct {
+	tokens []uint32
+	respCh chan error
 }
 
 func NewService(db *gorm.DB) *Service {
-	return &Service{
+	s := &Service{
 		instrumentService: instrument.NewInstrumentService(db),
-		tokenMap:          make(map[uint32]string),
-		tokens:            make([]uint32, 0),
+		globalTokenMap:    make(map[uint32]string),
+		clients:           make(map[string]*Client),
+		connectChan:       make(chan struct{}),
+		subscriptionChan:  make(chan subscriptionRequest),
 	}
+	go s.subscriptionHandler()
+	return s
 }
 
 func (s *Service) RunTickerStream(ctx context.Context, c echo.Context, userId, enctoken string, instruments []string, errChan chan<- error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	clientID := c.Response().Header().Get(echo.HeaderXRequestID)
+	if clientID == "" {
+		clientID = fmt.Sprintf("client-%d", time.Now().UnixNano())
+	}
 
 	tokenToInstrumentMap, tokens, err := s.prepareTokens(instruments)
 	if err != nil {
 		errChan <- err
 		return
 	}
-	s.tokenMap = tokenToInstrumentMap
-	s.tokens = tokens
 
-	if err := s.initTicker(userId, enctoken); err != nil {
-		errChan <- fmt.Errorf("failed to initialize ticker: %v", err)
+	clientChan := make(chan []byte, 100)
+	client := &Client{
+		ID:          clientID,
+		Instruments: instruments,
+		Tokens:      tokens,
+		TokenMap:    tokenToInstrumentMap,
+		Channel:     clientChan,
+	}
+
+	s.addClient(client)
+	defer s.removeClient(clientID)
+
+	s.mu.Lock()
+	if s.ticker == nil {
+		if err := s.initTicker(userId, enctoken); err != nil {
+			s.mu.Unlock()
+			errChan <- fmt.Errorf("failed to initialize ticker: %v", err)
+			return
+		}
+	}
+	s.mu.Unlock()
+
+	if err := s.waitForConnection(ctx); err != nil {
+		errChan <- fmt.Errorf("connection timeout: %v", err)
 		return
 	}
 
-	s.clientClosed = make(chan struct{})
+	if err := s.subscribeClientTokens(client.Tokens); err != nil {
+		errChan <- fmt.Errorf("failed to subscribe client tokens: %v", err)
+		return
+	}
 
-	var wg sync.WaitGroup
-	wg.Add(1)
+	// Set headers for SSE
+	c.Response().Header().Set(echo.HeaderContentType, "text/event-stream")
+	c.Response().Header().Set(echo.HeaderCacheControl, "no-cache")
+	c.Response().Header().Set(echo.HeaderConnection, "keep-alive")
+	c.Response().WriteHeader(http.StatusOK)
 
-	go s.runTicker(ctx, &wg, c, tokens, errChan)
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case data := <-clientChan:
+			if _, err := c.Response().Write(data); err != nil {
+				log.Printf("Error writing to client %s: %v", clientID, err)
+				return
+			}
+			c.Response().Flush()
+		}
+	}
+}
 
-	// Handle client disconnection
-	go func() {
-		<-c.Request().Context().Done()
-		log.Println("Client connection closed")
-		close(s.clientClosed)
-	}()
+func (s *Service) subscriptionHandler() {
+	for req := range s.subscriptionChan {
+		err := s.ticker.Subscribe(req.tokens)
+		if err == nil {
+			err = s.ticker.SetMode(kiteticker.ModeFull, req.tokens)
+		}
+		req.respCh <- err
+	}
+}
 
-	wg.Wait()
+func (s *Service) subscribeClientTokens(tokens []uint32) error {
+	respCh := make(chan error)
+	s.subscriptionChan <- subscriptionRequest{tokens: tokens, respCh: respCh}
+	return <-respCh
+}
+
+func (s *Service) waitForConnection(ctx context.Context) error {
+	s.mu.RLock()
+	if s.isConnected {
+		s.mu.RUnlock()
+		return nil
+	}
+	s.mu.RUnlock()
+
+	select {
+	case <-s.connectChan:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-time.After(30 * time.Second):
+		return fmt.Errorf("connection timeout")
+	}
+}
+
+func (s *Service) addClient(client *Client) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.clients[client.ID] = client
+	for token, instrument := range client.TokenMap {
+		s.globalTokenMap[token] = instrument
+	}
+}
+
+func (s *Service) removeClient(clientID string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if client, ok := s.clients[clientID]; ok {
+		close(client.Channel)
+		delete(s.clients, clientID)
+	}
+	s.cleanupGlobalTokenMap()
+}
+
+func (s *Service) cleanupGlobalTokenMap() {
+	newGlobalTokenMap := make(map[uint32]string)
+	for _, client := range s.clients {
+		for token, instrument := range client.TokenMap {
+			newGlobalTokenMap[token] = instrument
+		}
+	}
+	s.globalTokenMap = newGlobalTokenMap
 }
 
 func (s *Service) prepareTokens(strInstruments []string) (map[uint32]string, []uint32, error) {
@@ -90,50 +203,30 @@ func (s *Service) initTicker(userId, enctoken string) error {
 	if s.ticker == nil {
 		return fmt.Errorf("failed to create ticker: returned nil")
 	}
+	s.setupCallbacks()
+	go s.ticker.Serve()
 	return nil
 }
 
-func (s *Service) runTicker(ctx context.Context, wg *sync.WaitGroup, c echo.Context, tokens []uint32, errChan chan<- error) {
-	defer wg.Done()
-	defer s.ticker.Close()
-
-	s.setupCallbacks(c, tokens, errChan)
-
-	serveDone := make(chan struct{})
-	go func() {
-		defer close(serveDone)
-		s.ticker.Serve()
-	}()
-
-	select {
-	case <-ctx.Done():
-		log.Println("Context cancelled, stopping ticker")
-	case <-serveDone:
-		log.Println("Ticker.Serve() returned unexpectedly")
-		errChan <- fmt.Errorf("ticker.Serve() stopped unexpectedly")
-	}
-}
-
-func (s *Service) setupCallbacks(c echo.Context, tokens []uint32, errChan chan<- error) {
+func (s *Service) setupCallbacks() {
 	s.ticker.OnError(func(err error) {
 		log.Printf("Ticker error: %v", err)
-		errChan <- fmt.Errorf("ticker error: %w", err)
 	})
 
 	s.ticker.OnClose(func(code int, reason string) {
 		log.Printf("Ticker closed: code=%d, reason=%s", code, reason)
-		errChan <- fmt.Errorf("ticker closed: code=%d, reason=%s", code, reason)
+		s.mu.Lock()
+		s.isConnected = false
+		s.connectChan = make(chan struct{}) // Reset connect channel
+		s.mu.Unlock()
 	})
 
 	s.ticker.OnConnect(func() {
 		log.Println("Ticker connected")
-		if err := s.ticker.Subscribe(tokens); err != nil {
-			errChan <- fmt.Errorf("subscription error: %w", err)
-			return
-		}
-		if err := s.ticker.SetMode(kiteticker.ModeFull, tokens); err != nil {
-			errChan <- fmt.Errorf("set mode error: %w", err)
-		}
+		s.mu.Lock()
+		s.isConnected = true
+		close(s.connectChan)
+		s.mu.Unlock()
 	})
 
 	s.ticker.OnReconnect(func(attempt int, delay time.Duration) {
@@ -142,27 +235,20 @@ func (s *Service) setupCallbacks(c echo.Context, tokens []uint32, errChan chan<-
 
 	s.ticker.OnNoReconnect(func(attempt int) {
 		log.Printf("Ticker max reconnect attempts reached: attempt=%d", attempt)
-		errChan <- fmt.Errorf("ticker max reconnect attempts reached: %d", attempt)
 	})
 
 	s.ticker.OnTick(func(tick kiteticker.Tick) {
-		if err := s.sendTickData(c, tick); err != nil {
-			log.Printf("Error sending tick data: %v", err)
-		}
+		s.broadcastTick(tick)
 	})
 }
 
-func (s *Service) sendTickData(c echo.Context, tick kiteticker.Tick) error {
-	select {
-	case <-s.clientClosed:
-		return fmt.Errorf("client connection closed")
-	default:
-	}
+func (s *Service) broadcastTick(tick kiteticker.Tick) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 
-	symbolInfo, ok := s.tokenMap[tick.InstrumentToken]
+	symbolInfo, ok := s.globalTokenMap[tick.InstrumentToken]
 	if !ok {
-		log.Printf("symbolInfo not found for token: %d", tick.InstrumentToken)
-		return nil // Skip ticks for unknown symbols
+		return
 	}
 
 	exchange, tradingsymbol, _ := strings.Cut(symbolInfo, ":")
@@ -177,24 +263,19 @@ func (s *Service) sendTickData(c echo.Context, tick kiteticker.Tick) error {
 
 	jsonData, err := json.Marshal(tickData)
 	if err != nil {
-		return fmt.Errorf("error marshaling tick data: %w", err)
+		log.Printf("Error marshaling tick data: %v", err)
+		return
 	}
 
-	// Use a context with timeout for writing and flushing
-	ctx, cancel := context.WithTimeout(c.Request().Context(), 5*time.Second)
-	defer cancel()
+	data := []byte(fmt.Sprintf("data: %s\n\n", jsonData))
 
-	select {
-	case <-ctx.Done():
-		return fmt.Errorf("context cancelled before writing data")
-	case <-s.clientClosed:
-		return fmt.Errorf("client connection closed before writing data")
-	default:
-		if _, err := c.Response().Write([]byte(fmt.Sprintf("data: %s\n\n", jsonData))); err != nil {
-			return fmt.Errorf("error writing to response: %w", err)
+	for _, client := range s.clients {
+		if _, ok := client.TokenMap[tick.InstrumentToken]; ok {
+			select {
+			case client.Channel <- data:
+			default:
+				log.Printf("Skipping slow client: %s", client.ID)
+			}
 		}
-		c.Response().Flush()
 	}
-
-	return nil
 }
