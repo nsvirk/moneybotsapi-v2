@@ -107,26 +107,35 @@ func (s *InstrumentService) QueryInstruments(exchange, tradingsymbol, expiry, st
 
 // GetOptionChainNames returns a list of exchange:name for a given expiry
 func (s *InstrumentService) GetOptionChainNames(expiry string) ([]string, error) {
-
-	nameExchangeRows, err := s.repo.GetExchangeNamesForExpiry(expiry)
-	if err != nil {
-		return nil, err
-	}
-
-	return nameExchangeRows, nil
+	return s.repo.GetExchangeNamesForExpiry(expiry)
 }
 
 // GetOptionChainInstruments returns a list of instruments for a given exchange, name and expiry
-func (s *InstrumentService) GetOptionChainInstruments(exchange, name, expiry string) (map[string][]InstrumentModel, error) {
-	instrumentMap := make(map[string][]InstrumentModel)
-
+func (s *InstrumentService) GetOptionChainInstruments(exchange, name, expiry string, tokensBool, detailsBool bool) ([]interface{}, error) {
 	instruments, err := s.repo.GetOptionChainInstruments(exchange, name, expiry)
 	if err != nil {
 		return nil, err
 	}
 
-	instrumentMap[name] = instruments
+	if detailsBool {
+		result := make([]interface{}, len(instruments))
+		for i, v := range instruments {
+			result[i] = v
+		}
+		return result, nil
 
-	return instrumentMap, nil
+	} else if tokensBool {
+		tokensList := make([]interface{}, len(instruments))
+		for i, instrument := range instruments {
+			tokensList[i] = fmt.Sprintf("%d", instrument.InstrumentToken)
+		}
+		return tokensList, nil
 
+	} else {
+		symbolsList := make([]interface{}, len(instruments))
+		for i, instrument := range instruments {
+			symbolsList[i] = fmt.Sprintf("%s:%s", instrument.Exchange, instrument.Tradingsymbol)
+		}
+		return symbolsList, nil
+	}
 }
