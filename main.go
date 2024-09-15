@@ -12,7 +12,10 @@ import (
 	"github.com/nsvirk/moneybotsapi/shared/logger"
 	"github.com/nsvirk/moneybotsapi/shared/middleware"
 	"github.com/nsvirk/moneybotsapi/shared/zaplogger"
+	"gorm.io/gorm"
 )
+
+var ServerLogsTableName = "_server_logs"
 
 func main() {
 	// Setup logger
@@ -29,8 +32,8 @@ func main() {
 		zaplogger.Fatal("failed to load configuration", zaplogger.Fields{"error": err})
 	} else {
 		zaplogger.Info("  * loaded")
-		// zaplogger.Info(config.SingleLine)
 	}
+	zaplogger.Info(config.SingleLine)
 
 	// Print the configuration
 	fmt.Println(cfg.String())
@@ -55,39 +58,38 @@ func main() {
 		log.Fatalf("Failed to connect to Redis: %v", err)
 	}
 
-	// Initialize the logger - logs will be stored in the database
-	logger, err := logger.New(db)
-	if err != nil {
-		panic(err)
-	}
-
 	// Setup routes
 	setupRoutes(e, db, redisClient)
 
 	// Setup and start cron jobs
-	cronService := services.NewCronService(e, cfg, db, redisClient, logger)
+	cronService := services.NewCronService(e, cfg, db, redisClient)
 	cronService.Start()
 
 	// Start the server
-	startServer(e, cfg, logger)
+	startServer(e, cfg, db)
 
 }
 
 // startServer starts the Echo server on the specified port
-func startServer(e *echo.Echo, cfg *config.Config, logger *logger.Logger) {
+func startServer(e *echo.Echo, cfg *config.Config, db *gorm.DB) {
+	// Initialize the logger - logs will be stored in the database
+	logger, err := logger.New(db, ServerLogsTableName)
+	if err != nil {
+		panic(err)
+	}
+
 	port := cfg.ServerPort
 	if port == "" {
 		port = "3007"
 	}
+
 	// Database log
-	err := logger.Info("MAIN", "Server started", map[string]interface{}{
+	logger.Info("Server started", map[string]interface{}{
 		"name":    cfg.APIName,
 		"version": cfg.APIVersion,
 		"port":    port,
 	})
-	if err != nil {
-		panic(err)
-	}
+
 	// Console log
 	startupMessage := fmt.Sprintf("%s %s Server [:%s] started", cfg.APIName, cfg.APIVersion, cfg.ServerPort)
 	zaplogger.Info(config.SingleLine)
