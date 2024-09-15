@@ -21,12 +21,37 @@ func NewRepository(db *gorm.DB) *Repository {
 // --------------------------------------------
 // TickerInstruments func's grouped together
 // --------------------------------------------
-func (r *Repository) TruncateTickerInstruments() error {
-	result := r.DB.Exec(fmt.Sprintf("TRUNCATE TABLE %s", TickerInstrumentsTableName))
-	if result.Error != nil {
-		return fmt.Errorf("failed to truncate table %s: %v", TickerInstrumentsTableName, result.Error)
+func (r *Repository) TruncateTickerInstruments() (int64, error) {
+	// Start a transaction
+	tx := r.DB.Begin()
+	if tx.Error != nil {
+		return 0, fmt.Errorf("failed to begin transaction: %v", tx.Error)
 	}
-	return nil
+	defer func() {
+		if r := recover(); r != nil {
+			tx.Rollback()
+		}
+	}()
+
+	// Count the rows
+	var count int64
+	if err := tx.Table(TickerInstrumentsTableName).Count(&count).Error; err != nil {
+		tx.Rollback()
+		return 0, fmt.Errorf("failed to count rows in %s: %v", TickerInstrumentsTableName, err)
+	}
+
+	// Truncate the table
+	if err := tx.Exec(fmt.Sprintf("TRUNCATE TABLE %s;", TickerInstrumentsTableName)).Error; err != nil {
+		tx.Rollback()
+		return 0, fmt.Errorf("failed to truncate table %s: %v", TickerInstrumentsTableName, err)
+	}
+
+	// Commit the transaction
+	if err := tx.Commit().Error; err != nil {
+		return 0, fmt.Errorf("failed to commit transaction: %v", err)
+	}
+
+	return count, nil
 }
 
 // UpsertQueriedInstruments upserts instruments queried from the instrument table

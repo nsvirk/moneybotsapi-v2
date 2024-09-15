@@ -398,7 +398,7 @@ func (s *Service) getInstrumentTokens(instruments []string) (map[string]uint32, 
 	return instrumentTokens, notFoundInstruments, nil
 }
 
-func (s *Service) TruncateTickerInstruments() error {
+func (s *Service) TruncateTickerInstruments() (int64, error) {
 	return s.repo.TruncateTickerInstruments()
 }
 
