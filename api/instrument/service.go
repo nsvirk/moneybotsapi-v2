@@ -105,32 +105,27 @@ func (s *InstrumentService) QueryInstruments(exchange, tradingsymbol, expiry, st
 	return s.repo.QueryInstruments(exchange, tradingsymbol, expiry, strike, segment)
 }
 
+// GetOptionChainNames returns a list of exchange:name for a given expiry
 func (s *InstrumentService) GetOptionChainNames(expiry string) ([]string, error) {
 
-	names, err := s.repo.GetInstrumentNamesForExpiry(expiry)
+	nameExchangeRows, err := s.repo.GetExchangeNamesForExpiry(expiry)
 	if err != nil {
 		return nil, err
 	}
 
-	return names, nil
+	return nameExchangeRows, nil
 }
 
-func (s *InstrumentService) GetOptionChainInstruments(name, expiry string) (map[string][]InstrumentModel, error) {
+// GetOptionChainInstruments returns a list of instruments for a given exchange, name and expiry
+func (s *InstrumentService) GetOptionChainInstruments(exchange, name, expiry string) (map[string][]InstrumentModel, error) {
 	instrumentMap := make(map[string][]InstrumentModel)
 
-	names, err := s.repo.GetInstrumentNamesForExpiry(expiry)
+	instruments, err := s.repo.GetOptionChainInstruments(exchange, name, expiry)
 	if err != nil {
 		return nil, err
 	}
 
-	for _, name := range names {
-		instruments, err := s.repo.GetOptionChainInstrumentsForNameExpiry(name, expiry)
-		if err != nil {
-			return nil, err
-		}
-
-		instrumentMap[name] = instruments
-	}
+	instrumentMap[name] = instruments
 
 	return instrumentMap, nil
 

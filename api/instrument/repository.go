@@ -115,14 +115,32 @@ func (r *Repository) GetInstrumentByExchangeTradingsymbol(exchange, tradingsymbo
 	return instrument, err
 }
 
-func (r *Repository) GetInstrumentNamesForExpiry(expiry string) ([]string, error) {
-	var names []string
-	err := r.DB.Raw("SELECT DISTINCT name FROM api.instruments WHERE expiry = ?", expiry).Scan(&names).Error
-	return names, err
+// GetExchangeNamesForExpiry returns a list of exchange:name for a given expiry
+func (r *Repository) GetExchangeNamesForExpiry(expiry string) ([]string, error) {
+	var exchangeNames []string
+	err := r.DB.Raw("SELECT DISTINCT CONCAT(exchange, ':', name) AS name_exchange FROM api.instruments WHERE expiry = ?", expiry).Scan(&exchangeNames).Error
+	return exchangeNames, err
 }
 
-func (r *Repository) GetOptionChainInstrumentsForNameExpiry(name, expiry string) ([]InstrumentModel, error) {
-	var instruments []InstrumentModel
-	err := r.DB.Raw("SELECT * FROM api.get_optionchain_instruments_for_name_date(?, ?) ORDER BY strike ASC", name, expiry).Scan(&instruments).Error
-	return instruments, err
+// GetOptionChainInstruments returns a list of instruments for a given exchange, name and expiry
+func (r *Repository) GetOptionChainInstruments(exchange, name, expiry string) ([]InstrumentModel, error) {
+	// get the opt instruments
+	var optInstruments []InstrumentModel
+	err := r.DB.Raw("SELECT * FROM api.instruments WHERE instrument_type IN ('CE', 'PE') AND exchange = ? AND name = ? AND expiry = ?", exchange, name, expiry).Scan(&optInstruments).Error
+	if err != nil {
+		return nil, err
+	}
+
+	// get fut instruments
+	var futInstruments []InstrumentModel
+	err = r.DB.Raw("SELECT * FROM api.instruments WHERE instrument_type = 'FUT' AND exchange = ? AND name = ? AND expiry >= ? ORDER BY expiry ASC LIMIT 1", exchange, name, expiry).Scan(&futInstruments).Error
+	if err != nil {
+		return nil, err
+	}
+
+	// append the fut instruments to the opt instruments
+	ocInstruments := append(futInstruments, optInstruments...)
+
+	return ocInstruments, nil
+
 }

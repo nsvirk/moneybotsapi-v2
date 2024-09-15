@@ -9,7 +9,6 @@ var InstrumentsTableName = "instruments"
 
 // Instrument represents a trading instrument
 type InstrumentModel struct {
-	ID              uint32    `gorm:"primaryKey" json:"-"`
 	InstrumentToken uint32    `gorm:"primaryKey;uniqueIndex;index" csv:"instrument_token" json:"instrument_token"`
 	ExchangeToken   uint32    `csv:"exchange_token" json:"exchange_token"`
 	Tradingsymbol   string    `gorm:"index:idx_exchange_tradingsymbol,priority:2;index:idx_exch_trading_expiry,priority:2;index:idx_exch_trading_expiry_strike,priority:2" csv:"tradingsymbol" json:"tradingsymbol"`

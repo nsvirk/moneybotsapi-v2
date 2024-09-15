@@ -28,11 +28,13 @@ func NewHandler(db *gorm.DB) *Handler {
 	}
 }
 
+// UpdateInstrumentsResponseData is the response data for the UpdateInstruments endpoint
 type UpdateInstrumentsResponseData struct {
 	Timestamp string `json:"timestamp"`
 	Records   int    `json:"records"`
 }
 
+// UpdateInstruments updates the instruments in the database
 func (h *Handler) UpdateInstruments(c echo.Context) error {
 	totalInserted, err := h.InstrumentService.UpdateInstruments()
 	if err != nil {
@@ -47,6 +49,7 @@ func (h *Handler) UpdateInstruments(c echo.Context) error {
 	return response.SuccessResponse(c, responseData)
 }
 
+// GetIndexInstruments returns a list of instruments for a given list of index names
 func (h *Handler) GetIndexInstruments(c echo.Context) error {
 	indices := c.QueryParams()["i"]
 
@@ -68,11 +71,13 @@ func (h *Handler) GetIndexInstruments(c echo.Context) error {
 	return response.SuccessResponse(c, responseData)
 }
 
+// GetIndexNames returns a list of index names
 func (h *Handler) GetIndexNames(c echo.Context) error {
 	indices := h.IndexService.GetIndexNames()
 	return response.SuccessResponse(c, indices)
 }
 
+// QueryInstruments returns a list of instruments for a given exchange, tradingsymbol, expiry, strike and segment
 func (h *Handler) QueryInstruments(c echo.Context) error {
 	exchange := c.QueryParam("exchange")
 	tradingsymbol := c.QueryParam("tradingsymbol")
@@ -129,6 +134,7 @@ func (h *Handler) QueryInstruments(c echo.Context) error {
 	}
 }
 
+// GetInstrumentSymbols returns a list of instrument symbols for a given list of instrument tokens
 func (h *Handler) GetInstrumentSymbols(c echo.Context) error {
 	tokenParams := c.QueryParams()["t"]
 
@@ -153,6 +159,7 @@ func (h *Handler) GetInstrumentSymbols(c echo.Context) error {
 	return response.SuccessResponse(c, instrumentMap)
 }
 
+// GetInstrumentTokens returns a list of instrument tokens for a given list of instruments
 func (h *Handler) GetInstrumentTokens(c echo.Context) error {
 	instruments := c.QueryParams()["i"]
 
@@ -168,6 +175,7 @@ func (h *Handler) GetInstrumentTokens(c echo.Context) error {
 	return response.SuccessResponse(c, instrumentMap)
 }
 
+// GetOptionChainNames returns a list of exchange:name for a given expiry
 func (h *Handler) GetOptionChainNames(c echo.Context) error {
 	expiry := c.QueryParam("expiry")
 	if len(expiry) == 0 {
@@ -180,18 +188,31 @@ func (h *Handler) GetOptionChainNames(c echo.Context) error {
 		return response.ErrorResponse(c, http.StatusBadRequest, "invalid_request", "Invalid `expiry` format")
 	}
 
-	names, err := h.InstrumentService.GetOptionChainNames(expiry)
+	exchangeNames, err := h.InstrumentService.GetOptionChainNames(expiry)
 	if err != nil {
 		return response.ErrorResponse(c, http.StatusInternalServerError, "query_error", err.Error())
 	}
 
-	return response.SuccessResponse(c, names)
+	expiryNamesMap := make(map[string][]string)
+	if len(exchangeNames) == 0 {
+		expiryNamesMap[expiry] = []string{}
+	} else {
+		expiryNamesMap[expiry] = exchangeNames
+	}
+	return response.SuccessResponse(c, expiryNamesMap)
 }
 
+// GetOptionChainInstruments returns a list of instruments for a given exchange, name and expiry
 func (h *Handler) GetOptionChainInstruments(c echo.Context) error {
+	exchange := c.QueryParam("exchange")
 	name := c.QueryParam("name")
 	expiry := c.QueryParam("expiry")
+	tokens := c.QueryParam("tokens")
 	details := c.QueryParam("details")
+
+	if len(exchange) == 0 {
+		return response.ErrorResponse(c, http.StatusBadRequest, "invalid_request", "Input `exchange` is required")
+	}
 
 	if len(name) == 0 {
 		return response.ErrorResponse(c, http.StatusBadRequest, "invalid_request", "Input `name` is required")
@@ -206,6 +227,7 @@ func (h *Handler) GetOptionChainInstruments(c echo.Context) error {
 		return response.ErrorResponse(c, http.StatusBadRequest, "invalid_request", "Invalid `expiry` format")
 	}
 
+	// details is boolean
 	detailsBool, err := strconv.ParseBool(details)
 	if details != "" {
 		if err != nil {
@@ -213,7 +235,15 @@ func (h *Handler) GetOptionChainInstruments(c echo.Context) error {
 		}
 	}
 
-	instrumentsMap, err := h.InstrumentService.GetOptionChainInstruments(name, expiry)
+	// tokens is boolean
+	tokensBool, err := strconv.ParseBool(tokens)
+	if tokens != "" {
+		if err != nil {
+			return response.ErrorResponse(c, http.StatusBadRequest, "invalid_request", "Invalid `tokens` value")
+		}
+	}
+
+	instrumentsMap, err := h.InstrumentService.GetOptionChainInstruments(exchange, name, expiry)
 	if err != nil {
 		return response.ErrorResponse(c, http.StatusInternalServerError, "query_error", err.Error())
 	}
@@ -221,14 +251,23 @@ func (h *Handler) GetOptionChainInstruments(c echo.Context) error {
 	if detailsBool {
 		return response.SuccessResponse(c, instrumentsMap)
 
-	} else {
-		instrumentsMapList := make(map[string][]string, 0)
-		for name, instruments := range instrumentsMap {
+	} else if tokensBool {
+		tokensList := make([]string, 0)
+		for _, instruments := range instrumentsMap {
 			for _, instrument := range instruments {
-				instrumentsMapList[name] = append(instrumentsMapList[name], fmt.Sprintf("%s:%s", instrument.Exchange, instrument.Tradingsymbol))
+				tokensList = append(tokensList, fmt.Sprintf("%d", instrument.InstrumentToken))
 			}
 		}
-		return response.SuccessResponse(c, instrumentsMapList)
+		return response.SuccessResponse(c, tokensList)
+
+	} else {
+		symbolsList := make([]string, 0)
+		for _, instruments := range instrumentsMap {
+			for _, instrument := range instruments {
+				symbolsList = append(symbolsList, fmt.Sprintf("%s:%s", instrument.Exchange, instrument.Tradingsymbol))
+			}
+		}
+		return response.SuccessResponse(c, symbolsList)
 	}
 
 }
