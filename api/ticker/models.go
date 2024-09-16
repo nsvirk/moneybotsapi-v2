@@ -12,7 +12,7 @@ import (
 const (
 	TickerInstrumentsTableName = "ticker_instruments"
 	TickerDataTableName        = "ticker_data"
-	TickerLogTableName         = "ticker_logs"
+	TickerLogTableName         = "_ticker_logs"
 )
 
 // TICKER INSTRUMENTS -------------------------------------------------
@@ -32,28 +32,28 @@ func (TickerInstrument) TableName() string {
 // TICKER DATA --------------------------------------------------------
 // TickerData represents the tick data for an instrument
 type TickerData struct {
-	Instrument         string    `gorm:"index" json:"instrument"`
-	Mode               string    `gorm:"type:varchar(10)" json:"mode"`
-	InstrumentToken    uint32    `gorm:"primaryKey"  json:"instrument_token"`
-	IsTradable         bool      `json:"is_tradable"`
-	IsIndex            bool      `json:"is_index"`
-	Timestamp          time.Time `json:"timestamp"`
-	LastTradeTime      time.Time `json:"last_trade_time"`
-	LastPrice          float64   `gorm:"type:decimal(10,2);column:last_price" json:"last_price"`
-	LastTradedQuantity uint32    `gorm:"type:bigint;column:last_traded_quantity" json:"last_traded_quantity"`
-	TotalBuyQuantity   uint32    `gorm:"type:bigint;column:total_buy_quantity" json:"total_buy_quantity"`
-	TotalSellQuantity  uint32    `gorm:"type:bigint;column:total_sell_quantity" json:"total_sell_quantity"`
-	VolumeTraded       uint32    `gorm:"type:bigint;column:volume" json:"volume"`
+	Instrument         string         `gorm:"index" json:"instrument"`
+	InstrumentToken    uint32         `gorm:"primaryKey"  json:"instrument_token"`
+	Mode               string         `gorm:"type:varchar(10)" json:"mode"`
+	IsTradable         bool           `json:"is_tradable"`
+	IsIndex            bool           `json:"is_index"`
+	Timestamp          time.Time      `json:"timestamp"`
+	LastTradeTime      time.Time      `json:"last_trade_time"`
+	LastPrice          float64        `gorm:"type:decimal(10,2);column:last_price" json:"last_price"`
+	LastTradedQuantity uint32         `gorm:"type:bigint;column:last_traded_quantity" json:"last_traded_quantity"`
+	TotalBuyQuantity   uint32         `gorm:"type:bigint;column:total_buy_quantity" json:"total_buy_quantity"`
+	TotalSellQuantity  uint32         `gorm:"type:bigint;column:total_sell_quantity" json:"total_sell_quantity"`
+	VolumeTraded       uint32         `gorm:"type:bigint;column:volume" json:"volume"`
+	AverageTradePrice  float64        `gorm:"type:decimal(10,2);column:average_price" json:"average_price"`
+	OI                 uint32         `gorm:"type:bigint;column:oi" json:"oi"`
+	OIDayHigh          uint32         `gorm:"type:bigint;column:oi_day_high" json:"oi_day_high"`
+	OIDayLow           uint32         `gorm:"type:bigint;column:oi_day_low" json:"oi_day_low"`
+	NetChange          float64        `gorm:"type:decimal(10,2)" json:"net_change"`
+	OHLC               datatypes.JSON `gorm:"type:jsonb;column:ohlc" json:"ohlc"`
+	Depth              datatypes.JSON `gorm:"type:jsonb;column:depth" json:"depth"`
+	UpdatedAt          time.Time      `gorm:"autoUpdateTime:nano"  json:"updated_at"`
 	// TotalBuy           uint32         `gorm:"type:bigint" json:"total_buy"`
 	// TotalSell          uint32         `gorm:"type:bigint" json:"total_sell"`
-	AverageTradePrice float64        `gorm:"type:decimal(10,2);column:average_price" json:"average_price"`
-	OI                uint32         `gorm:"type:bigint;column:oi" json:"oi"`
-	OIDayHigh         uint32         `gorm:"type:bigint;column:oi_day_high" json:"oi_day_high"`
-	OIDayLow          uint32         `gorm:"type:bigint;column:oi_day_low" json:"oi_day_low"`
-	NetChange         float64        `gorm:"type:decimal(10,2)" json:"net_change"`
-	OHLC              datatypes.JSON `gorm:"type:jsonb;column:ohlc" json:"ohlc"`
-	Depth             datatypes.JSON `gorm:"type:jsonb;column:depth" json:"depth"`
-	UpdatedAt         time.Time      `gorm:"autoUpdateTime:nano"  json:"updated_at"`
 }
 
 type TickerDataOHLC struct {

@@ -97,20 +97,6 @@ func (r *Repository) UpsertQueriedInstruments(userID, exchange, tradingsymbol, e
 		return nil, err
 	}
 
-	// var tickerInstruments []TickerInstrument
-	// for _, instrument := range instruments {
-	// 	tickerInstruments = append(tickerInstruments, TickerInstrument{
-	// 		UserID:          userID,
-	// 		Instrument:      fmt.Sprintf("%s:%s", instrument.Exchange, instrument.Tradingsymbol),
-	// 		InstrumentToken: uint32(instrument.InstrumentToken),
-	// 		UpdatedAt:       time.Now(),
-	// 	})
-
-	// addedCount, updatedCount, err := r.UpsertTickerInstruments(userID, instrumentTokens)
-	// if err != nil {
-	// 	return nil, err
-	// }
-
 	totalCount, err := r.GetTickerInstrumentCount(userID)
 	if err != nil {
 		return nil, err
@@ -232,6 +218,7 @@ func (r *Repository) UpsertTickerData(tickerData []TickerData) error {
 		uniqueTickerData = append(uniqueTickerData, data)
 	}
 
+	// upsert in each field
 	err := r.DB.Transaction(func(tx *gorm.DB) error {
 		for _, data := range uniqueTickerData {
 			result := tx.Clauses(clause.OnConflict{
@@ -240,7 +227,7 @@ func (r *Repository) UpsertTickerData(tickerData []TickerData) error {
 			}).Create(&data)
 
 			if result.Error != nil {
-				return fmt.Errorf("failed to upsert ticker data for instrument %d: %v", data.InstrumentToken, result.Error)
+				return fmt.Errorf("failed to upsert ticker data for instrument %s: %v", data.Instrument, result.Error)
 			}
 		}
 		return nil

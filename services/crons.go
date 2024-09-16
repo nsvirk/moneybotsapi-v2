@@ -19,7 +19,7 @@ import (
 	"gorm.io/gorm"
 )
 
-var CronLogsTableName = "_cron_logs"
+var ServicesLogsTableName = "_service_logs"
 
 type CronService struct {
 	e                 *echo.Echo
@@ -41,7 +41,7 @@ func NewCronService(e *echo.Echo, cfg *config.Config, db *gorm.DB, redisClient *
 	instrumentService := instrument.NewInstrumentService(db)
 	indexService := instrument.NewIndexService()
 
-	cronLogger, err := logger.New(db, CronLogsTableName)
+	cronLogger, err := logger.New(db, ServicesLogsTableName)
 	if err != nil {
 		log.Fatalf("failed to create cron logger: %v", err)
 	}

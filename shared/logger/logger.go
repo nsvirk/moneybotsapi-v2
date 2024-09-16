@@ -55,34 +55,6 @@ func New(db *gorm.DB, tableName string) (*Logger, error) {
 	return logger, nil
 }
 
-// // log is a helper function to insert a log entry into the database
-// func (l *Logger) log(level LogLevel, message string, fields map[string]interface{}) error {
-// 	var fieldsJSON *string
-// 	if len(fields) > 0 {
-// 		jsonStr, err := json.Marshal(fields)
-// 		if err != nil {
-// 			return fmt.Errorf("failed to marshal fields: %v", err)
-// 		}
-// 		strJSON := string(jsonStr)
-// 		fieldsJSON = &strJSON
-// 	}
-
-// 	timestamp := time.Now()
-// 	entry := Log{
-// 		Timestamp: &timestamp,
-// 		Level:     &level,
-// 		Message:   &message,
-// 		Fields:    fieldsJSON,
-// 		tableName: l.tableName,
-// 	}
-
-// 	if err := l.db.Table(l.tableName).Create(&entry).Error; err != nil {
-// 		return fmt.Errorf("failed to insert log entry: %v", err)
-// 	}
-
-// 	return nil
-// }
-
 // log is a helper function to insert a log entry into the database
 func (l *Logger) log(level LogLevel, message string, fields map[string]interface{}) error {
 	var fieldsJSON datatypes.JSON
