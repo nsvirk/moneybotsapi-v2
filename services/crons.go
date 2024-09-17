@@ -67,8 +67,8 @@ func (cs *CronService) Start() {
 
 	// Add your scheduled jobs here
 	cs.addScheduledJob("API Instruments UPDATE job", cs.apiInstrumentsUpdateJob, "0 8 * * 1-5")      // Once at 08:00am, Mon-Fri
-	cs.addScheduledJob("API Indices UPDATE job", cs.apiIndicesUpdateJob, "1 8 * * 1-5")              // Once at 08:01am, Mon-Fri
-	cs.addScheduledJob("TickerInstruments UPDATE job", cs.tickerInstrumentsUpdateJob, "2 8 * * 1-5") // Once at 08:02am, Mon-Fri
+	cs.addScheduledJob("TickerInstruments UPDATE job", cs.tickerInstrumentsUpdateJob, "1 8 * * 1-5") // Once at 08:01am, Mon-Fri
+	cs.addScheduledJob("API Indices UPDATE job", cs.apiIndicesUpdateJob, "2 8 * * 1-5")              // Once at 08:02am, Mon-Fri
 
 	// Ticker starts at 9:00am and stops at 11:45pm - Covers NSE and MCX trading hours
 	cs.addScheduledJob("Ticker START job", cs.tickerStartJob, "0 9 * * 1-5") // Once at 09:00am, Mon-Fri
@@ -79,7 +79,7 @@ func (cs *CronService) Start() {
 	cs.addStartupJob("ApiInstruments UPDATE job", cs.apiInstrumentsUpdateJob, 3*time.Second)
 	cs.addStartupJob("ApiIndices UPDATE job", cs.apiIndicesUpdateJob, 8*time.Second)
 	cs.addStartupJob("TickerInstruments UPDATE job", cs.tickerInstrumentsUpdateJob, 30*time.Second)
-	cs.addStartupJob("Ticker START job", cs.tickerStartJob, 40*time.Second)
+	cs.addStartupJob("Ticker START job", cs.tickerStartJob, 35*time.Second)
 
 	// Log the initialization to database
 	cs.logger.Info("Initializing CronService", map[string]interface{}{
@@ -376,7 +376,7 @@ func (cs *CronService) tickerInstrumentsUpdateJob() {
 	}
 
 	// Add provision for upserting selected indices
-	indices := []string{"NSE:NIFTY 200", "NSE:NIFTY BANK"}
+	indices := []string{"NSE:NIFTY 50", "NSE:NIFTY 100", "NSE:NIFTY 200", "NSE:NIFTY 500", "NSE:NIFTY BANK", "NSE:NIFTY NEXT 50"}
 	for _, indexName := range indices {
 
 		indexInstruments, err := cs.indexService.GetNSEIndexInstruments(indexName)
@@ -392,17 +392,15 @@ func (cs *CronService) tickerInstrumentsUpdateJob() {
 		failedInstruments := []string{}
 
 		for _, instrument := range indexInstruments {
-			parts := strings.SplitN(instrument, ":", 2)
-			if len(parts) != 2 {
-				failedInstruments = append(failedInstruments, instrument)
-				continue
-			}
+			parts := strings.SplitN(instrument.Instrument, ":", 2)
 			exchange := parts[0]
 			tradingsymbol := parts[1]
-
 			result, err := cs.tickerService.UpsertQueriedInstruments(userID, exchange, tradingsymbol, "", "", "")
 			if err != nil {
-				failedInstruments = append(failedInstruments, instrument)
+				zaplogger.Error("TickerInstruments UPSERT for index failed:")
+				zaplogger.Error("  * index : " + indexName)
+				zaplogger.Error("  * error : " + err.Error())
+				zaplogger.Info("")
 				continue
 			}
 

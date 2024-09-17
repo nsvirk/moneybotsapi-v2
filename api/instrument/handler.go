@@ -61,11 +61,15 @@ func (h *Handler) GetIndexInstruments(c echo.Context) error {
 	responseData := make(map[string][]string)
 
 	for _, indexName := range indices {
-		instruments, err := h.IndexService.GetNSEIndexInstruments(indexName)
+		indexInstruments, err := h.IndexService.GetNSEIndexInstruments(indexName)
 		if err != nil {
 			return response.ErrorResponse(c, http.StatusInternalServerError, "fetch_error", fmt.Sprintf("Error fetching instruments for index %s: %v", indexName, err))
 		}
 
+		instruments := make([]string, len(indexInstruments))
+		for i, instrument := range indexInstruments {
+			instruments[i] = instrument.Instrument
+		}
 		responseData[indexName] = instruments
 	}
 

@@ -17,11 +17,11 @@ import (
 // NSEIndicesURLMap is a map of NSE indices and their corresponding URLs
 var NSEIndicesURLMap = map[string]string{
 	"NSE:NIFTY 50":      "https://archives.nseindia.com/content/indices/ind_nifty50list.csv",
-	"NSE:NIFTY BANK":    "https://archives.nseindia.com/content/indices/ind_niftybanklist.csv",
-	"NSE:NIFTY NEXT 50": "https://archives.nseindia.com/content/indices/ind_niftynext50list.csv",
 	"NSE:NIFTY 100":     "https://archives.nseindia.com/content/indices/ind_nifty100list.csv",
 	"NSE:NIFTY 200":     "https://archives.nseindia.com/content/indices/ind_nifty200list.csv",
-	// "NSE:NIFTY 500":     "https://archives.nseindia.com/content/indices/ind_nifty500list.csv",
+	"NSE:NIFTY 500":     "https://archives.nseindia.com/content/indices/ind_nifty500list.csv",
+	"NSE:NIFTY BANK":    "https://archives.nseindia.com/content/indices/ind_niftybanklist.csv",
+	"NSE:NIFTY NEXT 50": "https://archives.nseindia.com/content/indices/ind_niftynext50list.csv",
 	// "NSE:NIFTY MIDCAP 50":    "https://archives.nseindia.com/content/indices/ind_niftymidcap50list.csv",
 	// "NSE:NIFTY MIDCAP 100":   "https://archives.nseindia.com/content/indices/ind_niftymidcap100list.csv",
 	// "NSE:NIFTY SMALLCAP 100": "https://archives.nseindia.com/content/indices/ind_niftysmallcap100list.csv",
@@ -94,10 +94,9 @@ func (s *IndexService) UpdateNSEIndices() (int64, error) {
 		indexInstruments := make([]IndexModel, len(instruments))
 		for i, instrument := range instruments {
 			indexInstruments[i] = IndexModel{
-				IndexName:     indexName,
-				Exchange:      "NSE",
-				Tradingsymbol: instrument,
-				CreatedAt:     time.Now(),
+				IndexName:  indexName,
+				Instrument: instrument,
+				CreatedAt:  time.Now(),
 			}
 		}
 		count, err := s.repo.InsertIndices(indexInstruments)
@@ -150,32 +149,9 @@ func (s *IndexService) FetchNSEIndexInstruments(indexName string) ([]string, err
 	}
 
 	// -------------------------------------------------------------------------------------------------
-	// get url "https://www.nseindia.com/" first
-	// -------------------------------------------------------------------------------------------------
-	nseUrl := "https://www.nseindia.com/"
-	req, err := http.NewRequest("GET", nseUrl, nil)
-	if err != nil {
-		s.logger.Error("Failed to get nseUrl", map[string]interface{}{
-			"url":   nseUrl,
-			"error": err,
-		})
-		return nil, fmt.Errorf("failed to get nseUrl %s: %v", nseUrl, err)
-	}
-	req.Header.Add("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36")
-	resp, err := s.client.Do(req)
-	if err != nil {
-		s.logger.Error("Failed to get nseUrl", map[string]interface{}{
-			"url":   nseUrl,
-			"error": err,
-		})
-		return nil, fmt.Errorf("failed to get nseUrl %s: %v", nseUrl, err)
-	}
-	defer resp.Body.Close()
-
-	// -------------------------------------------------------------------------------------------------
 	// make request to index url
 	// -------------------------------------------------------------------------------------------------
-	req, err = http.NewRequest("GET", url, nil)
+	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		s.logger.Error("Failed to create request for index", map[string]interface{}{
 			"index_name": indexName,
@@ -186,7 +162,7 @@ func (s *IndexService) FetchNSEIndexInstruments(indexName string) ([]string, err
 	req.Header.Add("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36")
 	req.Header.Add("referer", "https://www.nseindia.com/")
 
-	resp, err = s.client.Do(req)
+	resp, err := s.client.Do(req)
 	if err != nil {
 		s.logger.Error("Failed to download CSV for index", map[string]interface{}{
 			"index_name": indexName,
@@ -227,6 +203,6 @@ func (s *IndexService) GetNSEIndexNames() []string {
 }
 
 // GetNSEIndexInstruments fetches the instruments for a given NSE index
-func (s *IndexService) GetNSEIndexInstruments(indexName string) ([]string, error) {
-	return s.FetchNSEIndexInstruments(indexName)
+func (s *IndexService) GetNSEIndexInstruments(indexName string) ([]IndexModel, error) {
+	return s.repo.GetNSEIndexInstruments(indexName)
 }

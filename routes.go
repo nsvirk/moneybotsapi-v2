@@ -10,10 +10,8 @@ import (
 	handlerQuote "github.com/nsvirk/moneybotsapi/api/quote"
 	handlerSession "github.com/nsvirk/moneybotsapi/api/session"
 	handlerStream "github.com/nsvirk/moneybotsapi/api/stream"
-	handlerTicker "github.com/nsvirk/moneybotsapi/api/ticker"
 	"github.com/nsvirk/moneybotsapi/config"
 	serviceSession "github.com/nsvirk/moneybotsapi/services/session"
-	serviceTicker "github.com/nsvirk/moneybotsapi/services/ticker"
 	"github.com/nsvirk/moneybotsapi/shared/middleware"
 	"github.com/nsvirk/moneybotsapi/shared/response"
 	"github.com/redis/go-redis/v9"
@@ -45,24 +43,28 @@ func setupRoutes(e *echo.Echo, db *gorm.DB, redisClient *redis.Client) {
 	instrumentHandler := handlerInstrument.NewHandler(db)
 	instrumentGroup := protected.Group("/instrument")
 	instrumentGroup.GET("/query", instrumentHandler.QueryInstruments)
-	instrumentGroup.GET("/index/names", instrumentHandler.GetIndexNames)
-	instrumentGroup.GET("/index", instrumentHandler.GetIndexInstruments)
 	instrumentGroup.GET("/tokens", instrumentHandler.GetInstrumentToTokenMap)
 	instrumentGroup.GET("/symbols", instrumentHandler.GetTokensToInstrumentMap)
-	instrumentGroup.GET("/optionchain/names", instrumentHandler.GetOptionChainNames)
-	instrumentGroup.GET("/optionchain", instrumentHandler.GetOptionChainInstruments)
 
-	// Ticker routes (protected)
-	tickerService := serviceTicker.NewService(db, redisClient)
-	tickerHandler := handlerTicker.NewHandler(tickerService)
-	tickerGroup := protected.Group("/ticker")
-	tickerGroup.GET("/instruments", tickerHandler.GetTickerInstruments)
-	tickerGroup.POST("/instruments", tickerHandler.AddTickerInstruments)
-	tickerGroup.DELETE("/instruments", tickerHandler.DeleteTickerInstruments)
-	tickerGroup.GET("/start", tickerHandler.TickerStart)
-	tickerGroup.GET("/stop", tickerHandler.TickerStop)
-	tickerGroup.GET("/restart", tickerHandler.TickerRestart)
-	tickerGroup.GET("/status", tickerHandler.TickerStatus)
+	indexGroup := protected.Group("/index")
+	indexGroup.GET("/names", instrumentHandler.GetIndexNames)
+	indexGroup.GET("/instruments", instrumentHandler.GetIndexInstruments)
+
+	optionchainGroup := protected.Group("/optionchain")
+	optionchainGroup.GET("/names", instrumentHandler.GetOptionChainNames)
+	optionchainGroup.GET("/instruments", instrumentHandler.GetOptionChainInstruments)
+
+	// // Ticker routes (protected)
+	// tickerService := serviceTicker.NewService(db, redisClient)
+	// tickerHandler := handlerTicker.NewHandler(tickerService)
+	// tickerGroup := protected.Group("/ticker")
+	// tickerGroup.GET("/instruments", tickerHandler.GetTickerInstruments)
+	// tickerGroup.POST("/instruments", tickerHandler.AddTickerInstruments)
+	// tickerGroup.DELETE("/instruments", tickerHandler.DeleteTickerInstruments)
+	// tickerGroup.GET("/start", tickerHandler.TickerStart)
+	// tickerGroup.GET("/stop", tickerHandler.TickerStop)
+	// tickerGroup.GET("/restart", tickerHandler.TickerRestart)
+	// tickerGroup.GET("/status", tickerHandler.TickerStatus)
 
 	// Quote routes (protected)
 	quoteService := handlerQuote.NewService(db)
