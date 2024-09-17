@@ -7,14 +7,15 @@ import (
 	"time"
 
 	"github.com/labstack/echo/v4"
+	"github.com/nsvirk/moneybotsapi/services/ticker"
 	"github.com/nsvirk/moneybotsapi/shared/response"
 )
 
 type Handler struct {
-	service *Service
+	service *ticker.TickerService
 }
 
-func NewHandler(service *Service) *Handler {
+func NewHandler(service *ticker.TickerService) *Handler {
 	return &Handler{service: service}
 }
 

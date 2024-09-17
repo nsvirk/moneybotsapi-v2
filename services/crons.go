@@ -9,17 +9,16 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/nsvirk/moneybotsapi/config"
 
-	"github.com/nsvirk/moneybotsapi/api/instrument"
-	"github.com/nsvirk/moneybotsapi/api/session"
-	"github.com/nsvirk/moneybotsapi/api/ticker"
+	"github.com/nsvirk/moneybotsapi/services/index"
+	"github.com/nsvirk/moneybotsapi/services/instrument"
+	"github.com/nsvirk/moneybotsapi/services/session"
+	"github.com/nsvirk/moneybotsapi/services/ticker"
 	"github.com/nsvirk/moneybotsapi/shared/logger"
 	"github.com/nsvirk/moneybotsapi/shared/zaplogger"
 	"github.com/redis/go-redis/v9"
 	"github.com/robfig/cron/v3"
 	"gorm.io/gorm"
 )
-
-var ServicesLogsTableName = "_service_logs"
 
 type CronService struct {
 	e                 *echo.Echo
@@ -28,20 +27,20 @@ type CronService struct {
 	redisClient       *redis.Client
 	logger            *logger.Logger
 	c                 *cron.Cron
-	sessionService    *session.Service
+	sessionService    *session.SessionService
 	instrumentService *instrument.InstrumentService
-	tickerService     *ticker.Service
-	indexService      *instrument.IndexService
+	indexService      *index.IndexService
+	tickerService     *ticker.TickerService
 }
 
 func NewCronService(e *echo.Echo, cfg *config.Config, db *gorm.DB, redisClient *redis.Client) *CronService {
 	// Initialize services
 	sessionService := session.NewService(db)
-	tickerService := ticker.NewService(db, redisClient)
 	instrumentService := instrument.NewInstrumentService(db)
-	indexService := instrument.NewIndexService()
+	indexService := index.NewIndexService(db)
+	tickerService := ticker.NewService(db, redisClient)
 
-	cronLogger, err := logger.New(db, ServicesLogsTableName)
+	cronLogger, err := logger.New(db, "CRON SERVICE")
 	if err != nil {
 		log.Fatalf("failed to create cron logger: %v", err)
 	}
@@ -64,22 +63,23 @@ func (cs *CronService) Start() {
 	// Log the initialization to logger
 	zaplogger.Info(config.SingleLine)
 	zaplogger.Info("Initializing CronService")
+	zaplogger.Info(config.SingleLine)
 
 	// Add your scheduled jobs here
-	cs.addScheduledJob("API Instruments UPDATE job", cs.apiInstrumentsUpdateJob, "0 8 * * 1-5")       // Once at 08:00am, Mon-Fri
-	cs.addScheduledJob("TickerInstruments UPDATE job", cs.tickerInstrumentsUpdateJob, "30 8 * * 1-5") // Once at 08:30am, Mon-Fri
+	cs.addScheduledJob("API Instruments UPDATE job", cs.apiInstrumentsUpdateJob, "0 8 * * 1-5")      // Once at 08:00am, Mon-Fri
+	cs.addScheduledJob("API Indices UPDATE job", cs.apiIndicesUpdateJob, "1 8 * * 1-5")              // Once at 08:01am, Mon-Fri
+	cs.addScheduledJob("TickerInstruments UPDATE job", cs.tickerInstrumentsUpdateJob, "2 8 * * 1-5") // Once at 08:02am, Mon-Fri
 
 	// Ticker starts at 9:00am and stops at 11:45pm - Covers NSE and MCX trading hours
 	cs.addScheduledJob("Ticker START job", cs.tickerStartJob, "0 9 * * 1-5") // Once at 09:00am, Mon-Fri
 	cs.addScheduledJob("Ticker STOP job", cs.tickerStopJob, "45 23 * * 1-5") // Once at 11:45pm, Mon-Fri
 
 	// Add your startup jobs here
-	cs.addStartupJob("ApiInstruments UPDATE job", cs.apiInstrumentsUpdateJob, 1*time.Second)
-	cs.addStartupJob("TickerInstruments UPDATE job", cs.tickerInstrumentsUpdateJob, 5*time.Second)
-	cs.addStartupJob("TickerData TRUNCATE job", cs.tickerDataTruncateJob, 5*time.Second)
-
-	// Ticker starts 15 secs after STARTUP
-	cs.addStartupJob("Ticker START job", cs.tickerStartJob, 15*time.Second)
+	cs.addStartupJob("TickerData TRUNCATE job", cs.tickerDataTruncateJob, 1*time.Second)
+	cs.addStartupJob("ApiInstruments UPDATE job", cs.apiInstrumentsUpdateJob, 3*time.Second)
+	cs.addStartupJob("ApiIndices UPDATE job", cs.apiIndicesUpdateJob, 8*time.Second)
+	cs.addStartupJob("TickerInstruments UPDATE job", cs.tickerInstrumentsUpdateJob, 30*time.Second)
+	cs.addStartupJob("Ticker START job", cs.tickerStartJob, 40*time.Second)
 
 	// Log the initialization to database
 	cs.logger.Info("Initializing CronService", map[string]interface{}{
@@ -159,16 +159,38 @@ func (cs *CronService) apiInstrumentsUpdateJob() {
 	zaplogger.Info(config.SingleLine)
 }
 
+func (cs *CronService) apiIndicesUpdateJob() {
+
+	totalInserted, err := cs.indexService.UpdateNSEIndices()
+	if err != nil {
+		cs.logger.Error("ApiIndices UPDATE job failed", map[string]interface{}{
+			"error": err.Error(),
+		})
+		zaplogger.Info("")
+		zaplogger.Error("ApiIndices UPDATE job failed")
+		zaplogger.Error("  * error    : " + err.Error())
+		zaplogger.Info("")
+		return
+	}
+
+	cs.logger.Info("ApiIndices UPDATE job successful", map[string]interface{}{
+		"total_inserted": totalInserted,
+	})
+	zaplogger.Info("")
+	zaplogger.Info("ApiIndices UPDATE job successful")
+	zaplogger.Info("  * total_inserted    : " + strconv.FormatInt(totalInserted, 10))
+	zaplogger.Info("")
+	zaplogger.Info(config.SingleLine)
+}
+
 func (cs *CronService) tickerStartJob() {
 
 	// Generate the session
-	loginRequest := session.LoginRequest{
-		UserID:     cs.cfg.KitetickerUserID,
-		Password:   cs.cfg.KitetickerPassword,
-		TOTPSecret: cs.cfg.KitetickerTotpSecret,
-	}
+	userId := cs.cfg.KitetickerUserID
+	password := cs.cfg.KitetickerPassword
+	totpSecret := cs.cfg.KitetickerTotpSecret
 
-	sessionData, err := cs.sessionService.GenerateSession(loginRequest)
+	sessionData, err := cs.sessionService.GenerateSession(userId, password, totpSecret)
 	if err != nil {
 		cs.logger.Error("Ticker START job failed [GenerateSession]", map[string]interface{}{
 			"error": err.Error(),
@@ -261,6 +283,7 @@ func (cs *CronService) tickerDataTruncateJob() {
 
 func (cs *CronService) tickerInstrumentsUpdateJob() {
 	userID := cs.cfg.KitetickerUserID
+	totalInserted := 0
 
 	// Truncate the table
 	count, err := cs.tickerService.TruncateTickerInstruments()
@@ -341,21 +364,22 @@ func (cs *CronService) tickerInstrumentsUpdateJob() {
 			zaplogger.Info("")
 			continue
 		}
+		totalInserted += result["inserted"].(int) + result["updated"].(int)
 
 		zaplogger.Info("TickerInstruments UPSERT for query successful:")
 		zaplogger.Info("  * query      : " + q.description)
 		zaplogger.Info("  * queried    : " + strconv.Itoa(result["queried"].(int)))
-		zaplogger.Info("  * added      : " + strconv.Itoa(result["added"].(int)))
+		zaplogger.Info("  * inserted   : " + strconv.Itoa(result["inserted"].(int)))
 		zaplogger.Info("  * updated    : " + strconv.Itoa(result["updated"].(int)))
-		zaplogger.Info("  * total      : " + strconv.FormatInt(result["total"].(int64), 10))
+		zaplogger.Info("  * total      : " + strconv.Itoa(totalInserted))
 		zaplogger.Info("")
 	}
 
 	// Add provision for upserting selected indices
-	indices := []string{"NSE:NIFTY 500", "NSE:NIFTY BANK"}
+	indices := []string{"NSE:NIFTY 200", "NSE:NIFTY BANK"}
 	for _, indexName := range indices {
 
-		instruments, err := cs.indexService.GetIndexInstruments(indexName)
+		indexInstruments, err := cs.indexService.GetNSEIndexInstruments(indexName)
 		if err != nil {
 			zaplogger.Error("TickerInstruments FETCH for index failed:")
 			zaplogger.Error("  * index : " + indexName)
@@ -364,37 +388,39 @@ func (cs *CronService) tickerInstrumentsUpdateJob() {
 			continue
 		}
 
-		totalQueried, totalAdded, totalUpdated := 0, 0, 0
-		var totalInstruments int64 = 0
+		queried, inserted, updated := 0, 0, 0
 		failedInstruments := []string{}
 
-		for _, instr := range instruments {
-			parts := strings.SplitN(instr, ":", 2)
+		for _, instrument := range indexInstruments {
+			parts := strings.SplitN(instrument, ":", 2)
 			if len(parts) != 2 {
-				failedInstruments = append(failedInstruments, instr)
+				failedInstruments = append(failedInstruments, instrument)
 				continue
 			}
+			exchange := parts[0]
+			tradingsymbol := parts[1]
 
-			result, err := cs.tickerService.UpsertQueriedInstruments(userID, parts[0], parts[1], "", "", "")
+			result, err := cs.tickerService.UpsertQueriedInstruments(userID, exchange, tradingsymbol, "", "", "")
 			if err != nil {
-				failedInstruments = append(failedInstruments, instr)
+				failedInstruments = append(failedInstruments, instrument)
 				continue
 			}
 
-			totalQueried += result["queried"].(int)
-			totalAdded += result["added"].(int)
-			totalUpdated += result["updated"].(int)
-			totalInstruments = result["total"].(int64)
+			queried += result["queried"].(int)
+			inserted += result["inserted"].(int)
+			updated += result["updated"].(int)
 		}
+
+		totalInserted += inserted + updated
 
 		// Log the accumulated results for the index
 		zaplogger.Info("TickerInstruments UPSERT for index successful:")
 		zaplogger.Info("  * index       : " + indexName + " [INDEX]")
-		zaplogger.Info("  * instruments : " + strconv.Itoa(len(instruments)))
-		zaplogger.Info("  * queried     : " + strconv.Itoa(totalQueried))
-		zaplogger.Info("  * added       : " + strconv.Itoa(totalAdded))
-		zaplogger.Info("  * updated     : " + strconv.Itoa(totalUpdated))
-		zaplogger.Info("  * total       : " + strconv.FormatInt(totalInstruments, 10))
+		zaplogger.Info("  * instruments : " + strconv.Itoa(len(indexInstruments)))
+		zaplogger.Info("  * queried     : " + strconv.Itoa(queried))
+		zaplogger.Info("  * inserted    : " + strconv.Itoa(inserted))
+		zaplogger.Info("  * updated     : " + strconv.Itoa(updated))
+		zaplogger.Info("  * total       : " + strconv.Itoa(totalInserted))
 
 		if len(failedInstruments) > 0 {
 			zaplogger.Error("  * failed      : " + strconv.Itoa(len(failedInstruments)))

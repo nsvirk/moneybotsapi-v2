@@ -6,12 +6,14 @@ import (
 	"log"
 
 	"github.com/labstack/echo/v4"
-	"github.com/nsvirk/moneybotsapi/api/instrument"
-	"github.com/nsvirk/moneybotsapi/api/quote"
-	"github.com/nsvirk/moneybotsapi/api/session"
-	"github.com/nsvirk/moneybotsapi/api/stream"
-	"github.com/nsvirk/moneybotsapi/api/ticker"
+	handlerInstrument "github.com/nsvirk/moneybotsapi/api/instrument"
+	handlerQuote "github.com/nsvirk/moneybotsapi/api/quote"
+	handlerSession "github.com/nsvirk/moneybotsapi/api/session"
+	handlerStream "github.com/nsvirk/moneybotsapi/api/stream"
+	handlerTicker "github.com/nsvirk/moneybotsapi/api/ticker"
 	"github.com/nsvirk/moneybotsapi/config"
+	serviceSession "github.com/nsvirk/moneybotsapi/services/session"
+	serviceTicker "github.com/nsvirk/moneybotsapi/services/ticker"
 	"github.com/nsvirk/moneybotsapi/shared/middleware"
 	"github.com/nsvirk/moneybotsapi/shared/response"
 	"github.com/redis/go-redis/v9"
@@ -28,8 +30,8 @@ func setupRoutes(e *echo.Echo, db *gorm.DB, redisClient *redis.Client) {
 	api.GET("/", indexRoute)
 
 	// Session routes - Unprotected
-	sessionService := session.NewService(db)
-	sessionHandler := session.NewHandler(sessionService)
+	sessionService := serviceSession.NewService(db)
+	sessionHandler := handlerSession.NewHandler(sessionService)
 	sessionGroup := api.Group("/session")
 	sessionGroup.POST("/login", sessionHandler.GenerateSession)
 	sessionGroup.POST("/totp", sessionHandler.GenerateTOTP)
@@ -40,24 +42,20 @@ func setupRoutes(e *echo.Echo, db *gorm.DB, redisClient *redis.Client) {
 	protected.Use(middleware.AuthMiddleware(sessionService))
 
 	// Instrument routes (protected)
-	instrumentHandler := instrument.NewHandler(db)
+	instrumentHandler := handlerInstrument.NewHandler(db)
 	instrumentGroup := protected.Group("/instrument")
-	// instrumentGroup := api.Group("/instrument") // for debugging
-	instrumentGroup.POST("/update", instrumentHandler.UpdateInstruments)
 	instrumentGroup.GET("/query", instrumentHandler.QueryInstruments)
 	instrumentGroup.GET("/index/names", instrumentHandler.GetIndexNames)
 	instrumentGroup.GET("/index", instrumentHandler.GetIndexInstruments)
-	instrumentGroup.GET("/tokens", instrumentHandler.GetInstrumentTokens)
-	instrumentGroup.GET("/symbols", instrumentHandler.GetInstrumentSymbols)
+	instrumentGroup.GET("/tokens", instrumentHandler.GetInstrumentToTokenMap)
+	instrumentGroup.GET("/symbols", instrumentHandler.GetTokensToInstrumentMap)
 	instrumentGroup.GET("/optionchain/names", instrumentHandler.GetOptionChainNames)
 	instrumentGroup.GET("/optionchain", instrumentHandler.GetOptionChainInstruments)
 
 	// Ticker routes (protected)
-	// Initialize ticker components
-	tickerService := ticker.NewService(db, redisClient)
-	tickerHandler := ticker.NewHandler(tickerService)
+	tickerService := serviceTicker.NewService(db, redisClient)
+	tickerHandler := handlerTicker.NewHandler(tickerService)
 	tickerGroup := protected.Group("/ticker")
-	// tickerGroup := api.Group("/ticker") // for debugging
 	tickerGroup.GET("/instruments", tickerHandler.GetTickerInstruments)
 	tickerGroup.POST("/instruments", tickerHandler.AddTickerInstruments)
 	tickerGroup.DELETE("/instruments", tickerHandler.DeleteTickerInstruments)
@@ -67,16 +65,15 @@ func setupRoutes(e *echo.Echo, db *gorm.DB, redisClient *redis.Client) {
 	tickerGroup.GET("/status", tickerHandler.TickerStatus)
 
 	// Quote routes (protected)
-	quoteService := quote.NewService(db)
-	quoteHandler := quote.NewHandler(quoteService)
-	// quoteGroup := api.Group("/quote") // for debugging
+	quoteService := handlerQuote.NewService(db)
+	quoteHandler := handlerQuote.NewHandler(quoteService)
 	quoteGroup := protected.Group("/quote")
 	quoteGroup.GET("", quoteHandler.GetQuote)
 	quoteGroup.GET("/ohlc", quoteHandler.GetOHLC)
 	quoteGroup.GET("/ltp", quoteHandler.GetLTP)
 
 	// Stream routes (protected)
-	streamHandler := stream.NewHandler(db)
+	streamHandler := handlerStream.NewHandler(db)
 	streamGroup := protected.Group("/stream")
 	streamGroup.POST("/ticks", streamHandler.StreamTickerData)
 

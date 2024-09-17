@@ -10,6 +10,8 @@ import (
 	"gorm.io/gorm"
 )
 
+var LogsTableName = "_logs"
+
 // LogLevel represents the severity of a log message
 type LogLevel string
 
@@ -23,34 +25,34 @@ const (
 
 // Log represents a log entry in the database
 type Log struct {
-	ID        uint       `gorm:"primaryKey"`
-	Timestamp *time.Time `gorm:"index"`
-	Level     *LogLevel  `gorm:"index"`
-	Message   *string
-	// Fields    *string // JSON string of fields
+	ID        uint32    `gorm:"primaryKey"`
+	Timestamp time.Time `gorm:"index"`
+	Package   string    `gorm:"index"`
+	Level     LogLevel  `gorm:"index"`
+	Message   string
 	Fields    datatypes.JSON `gorm:"type:jsonb"` // Changed to JSONB type
-	tableName string         `gorm:"-"`          // This field is used internally and not stored in the database
 }
 
 // TableName overrides the table name used by Log
 func (l *Log) TableName() string {
-	return l.tableName
+	return LogsTableName
 }
 
 // Logger is the main struct for the logger
 type Logger struct {
-	db        *gorm.DB
-	tableName string
+	db          *gorm.DB
+	packageName string
+	tableName   string
 }
 
 // New creates a new Logger instance
-func New(db *gorm.DB, tableName string) (*Logger, error) {
+func New(db *gorm.DB, packageName string) (*Logger, error) {
 	logger := &Logger{
-		db:        db,
-		tableName: tableName,
+		db:          db,
+		packageName: packageName,
 	}
-	if err := db.Table(tableName).AutoMigrate(&Log{}); err != nil {
-		return nil, fmt.Errorf("failed to migrate Log for table %s: %v", tableName, err)
+	if err := db.Table(LogsTableName).AutoMigrate(&Log{}); err != nil {
+		return nil, fmt.Errorf("failed to migrate Log for table %s: %v", LogsTableName, err)
 	}
 	return logger, nil
 }
@@ -68,11 +70,11 @@ func (l *Logger) log(level LogLevel, message string, fields map[string]interface
 
 	timestamp := time.Now()
 	entry := Log{
-		Timestamp: &timestamp,
-		Level:     &level,
-		Message:   &message,
+		Timestamp: timestamp,
+		Package:   l.packageName,
+		Level:     level,
+		Message:   message,
 		Fields:    fieldsJSON,
-		tableName: l.tableName,
 	}
 
 	if err := l.db.Table(l.tableName).Create(&entry).Error; err != nil {

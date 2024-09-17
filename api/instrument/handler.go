@@ -1,5 +1,4 @@
-// File: github.com/nsvirk/moneybotsapi/instrument/handler.go
-
+// Package instrument contains the handler for the instrument API
 package instrument
 
 import (
@@ -10,21 +9,23 @@ import (
 	"time"
 
 	"github.com/labstack/echo/v4"
+	"github.com/nsvirk/moneybotsapi/services/index"
+	"github.com/nsvirk/moneybotsapi/services/instrument"
 	"github.com/nsvirk/moneybotsapi/shared/response"
 	"gorm.io/gorm"
 )
 
 type Handler struct {
 	DB                *gorm.DB
-	InstrumentService *InstrumentService
-	IndexService      *IndexService
+	InstrumentService *instrument.InstrumentService
+	IndexService      *index.IndexService
 }
 
 func NewHandler(db *gorm.DB) *Handler {
 	return &Handler{
 		DB:                db,
-		InstrumentService: NewInstrumentService(db),
-		IndexService:      NewIndexService(),
+		InstrumentService: instrument.NewInstrumentService(db),
+		IndexService:      index.NewIndexService(db),
 	}
 }
 
@@ -60,7 +61,7 @@ func (h *Handler) GetIndexInstruments(c echo.Context) error {
 	responseData := make(map[string][]string)
 
 	for _, indexName := range indices {
-		instruments, err := h.IndexService.GetIndexInstruments(indexName)
+		instruments, err := h.IndexService.GetNSEIndexInstruments(indexName)
 		if err != nil {
 			return response.ErrorResponse(c, http.StatusInternalServerError, "fetch_error", fmt.Sprintf("Error fetching instruments for index %s: %v", indexName, err))
 		}
@@ -73,7 +74,7 @@ func (h *Handler) GetIndexInstruments(c echo.Context) error {
 
 // GetIndexNames returns a list of index names
 func (h *Handler) GetIndexNames(c echo.Context) error {
-	indices := h.IndexService.GetIndexNames()
+	indices := h.IndexService.GetNSEIndexNames()
 	return response.SuccessResponse(c, indices)
 }
 
@@ -135,7 +136,7 @@ func (h *Handler) QueryInstruments(c echo.Context) error {
 }
 
 // GetInstrumentSymbols returns a list of instrument symbols for a given list of instrument tokens
-func (h *Handler) GetInstrumentSymbols(c echo.Context) error {
+func (h *Handler) GetTokensToInstrumentMap(c echo.Context) error {
 	tokenParams := c.QueryParams()["t"]
 
 	if len(tokenParams) == 0 {
@@ -151,7 +152,7 @@ func (h *Handler) GetInstrumentSymbols(c echo.Context) error {
 		tokens = append(tokens, uint32(token))
 	}
 
-	instrumentMap, err := h.InstrumentService.GetInstrumentSymbols(tokens)
+	instrumentMap, err := h.InstrumentService.GetTokensToInstrumentMap(tokens)
 	if err != nil {
 		return response.ErrorResponse(c, http.StatusInternalServerError, "query_error", err.Error())
 	}
@@ -160,7 +161,7 @@ func (h *Handler) GetInstrumentSymbols(c echo.Context) error {
 }
 
 // GetInstrumentTokens returns a list of instrument tokens for a given list of instruments
-func (h *Handler) GetInstrumentTokens(c echo.Context) error {
+func (h *Handler) GetInstrumentToTokenMap(c echo.Context) error {
 	instruments := c.QueryParams()["i"]
 
 	if len(instruments) == 0 {
@@ -207,8 +208,7 @@ func (h *Handler) GetOptionChainInstruments(c echo.Context) error {
 	exchange := c.QueryParam("exchange")
 	name := c.QueryParam("name")
 	expiry := c.QueryParam("expiry")
-	tokens := c.QueryParam("tokens")
-	details := c.QueryParam("details")
+	returnType := c.QueryParam("return_type")
 
 	if len(exchange) == 0 {
 		return response.ErrorResponse(c, http.StatusBadRequest, "invalid_request", "Input `exchange` is required")
@@ -227,23 +227,7 @@ func (h *Handler) GetOptionChainInstruments(c echo.Context) error {
 		return response.ErrorResponse(c, http.StatusBadRequest, "invalid_request", "Invalid `expiry` format")
 	}
 
-	// tokens is boolean
-	tokensBool, err := strconv.ParseBool(tokens)
-	if tokens != "" {
-		if err != nil {
-			return response.ErrorResponse(c, http.StatusBadRequest, "invalid_request", "Invalid `tokens` value")
-		}
-	}
-
-	// details is boolean
-	detailsBool, err := strconv.ParseBool(details)
-	if details != "" {
-		if err != nil {
-			return response.ErrorResponse(c, http.StatusBadRequest, "invalid_request", "Invalid `details` value")
-		}
-	}
-
-	instruments, err := h.InstrumentService.GetOptionChainInstruments(exchange, name, expiry, tokensBool, detailsBool)
+	instruments, err := h.InstrumentService.GetOptionChainInstruments(exchange, name, expiry, returnType)
 	if err != nil {
 		return response.ErrorResponse(c, http.StatusInternalServerError, "query_error", err.Error())
 	}

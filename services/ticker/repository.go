@@ -2,10 +2,9 @@ package ticker
 
 import (
 	"fmt"
-	"strconv"
 	"time"
 
-	"github.com/nsvirk/moneybotsapi/api/instrument"
+	"github.com/nsvirk/moneybotsapi/services/instrument"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -14,6 +13,7 @@ type Repository struct {
 	DB *gorm.DB
 }
 
+// NewRepository creates a new Repository
 func NewRepository(db *gorm.DB) *Repository {
 	return &Repository{DB: db}
 }
@@ -21,6 +21,7 @@ func NewRepository(db *gorm.DB) *Repository {
 // --------------------------------------------
 // TickerInstruments func's grouped together
 // --------------------------------------------
+// TruncateTickerInstruments truncates the ticker instruments
 func (r *Repository) TruncateTickerInstruments() (int64, error) {
 	// Start a transaction
 	tx := r.DB.Begin()
@@ -54,70 +55,12 @@ func (r *Repository) TruncateTickerInstruments() (int64, error) {
 	return count, nil
 }
 
-// UpsertQueriedInstruments upserts instruments queried from the instrument table
-//
-//	used by cron job to keep ticker instruments updated
-func (r *Repository) UpsertQueriedInstruments(userID, exchange, tradingsymbol, expiry, strike, segment string) (map[string]interface{}, error) {
-	query := r.DB.Model(&instrument.InstrumentModel{})
+// UpsertTickerInstruments upserts the instruments
+func (r *Repository) UpsertTickerInstruments(userID string, instrumentsTokenMap map[string]uint32) (int, int, error) {
+	var insertedCount int
+	var updatedCount int
 
-	if exchange != "" {
-		query = query.Where("exchange LIKE ?", exchange)
-	}
-	if tradingsymbol != "" {
-		query = query.Where("tradingsymbol LIKE ?", tradingsymbol)
-	}
-	if expiry != "" {
-		query = query.Where("expiry LIKE ?", expiry)
-	}
-	if strike != "" {
-		strikeFloat, err := strconv.ParseFloat(strike, 64)
-		if err != nil {
-			return nil, err
-		}
-		query = query.Where("strike = ?", strikeFloat)
-	}
-
-	if segment != "" {
-		query = query.Where("segment LIKE ?", segment)
-	}
-
-	var instruments []instrument.InstrumentModel
-	if err := query.Find(&instruments).Error; err != nil {
-		return nil, err
-	}
-
-	instrumentTokens := make(map[string]uint32)
-	for _, instrument := range instruments {
-		key := fmt.Sprintf("%s:%s", instrument.Exchange, instrument.Tradingsymbol)
-		instrumentTokens[key] = uint32(instrument.InstrumentToken)
-	}
-
-	addedCount, updatedCount, err := r.upsertInstruments(userID, instrumentTokens)
-	if err != nil {
-		return nil, err
-	}
-
-	totalCount, err := r.GetTickerInstrumentCount(userID)
-	if err != nil {
-		return nil, err
-	}
-
-	response := map[string]interface{}{
-		"user_id": userID,
-		"queried": len(instruments),
-		"added":   addedCount,
-		"updated": updatedCount,
-		"total":   totalCount,
-	}
-
-	return response, nil
-}
-
-func (r *Repository) upsertInstruments(userID string, instrumentTokens map[string]uint32) (int, int, error) {
-	addedCount := 0
-	updatedCount := 0
-
-	for instrument, token := range instrumentTokens {
+	for instrument, token := range instrumentsTokenMap {
 		result := r.DB.Clauses(clause.OnConflict{
 			Columns: []clause.Column{
 				{Name: "user_id"},
@@ -136,55 +79,30 @@ func (r *Repository) upsertInstruments(userID string, instrumentTokens map[strin
 		}
 
 		if result.RowsAffected == 1 {
-			addedCount++
+			insertedCount++
 		} else {
 			updatedCount++
 		}
 	}
 
-	return addedCount, updatedCount, nil
+	return insertedCount, updatedCount, nil
 }
 
-func (r *Repository) AddTickerInstruments(userID string, tickerInstruments []TickerInstrument) (int64, error) {
-
-	var upsertedCount int64
-
-	for _, instrument := range tickerInstruments {
-		result := r.DB.Clauses(clause.OnConflict{
-			Columns: []clause.Column{
-				{Name: "user_id"},
-				{Name: "instrument"},
-			},
-			DoUpdates: clause.AssignmentColumns([]string{"instrument_token", "updated_at"}),
-		}).Create(&TickerInstrument{
-			UserID:          userID,
-			Instrument:      instrument.Instrument,
-			InstrumentToken: instrument.InstrumentToken,
-			UpdatedAt:       time.Now(),
-		})
-
-		if result.Error != nil {
-			return upsertedCount, fmt.Errorf("error upserting instrument: %v", result.Error)
-		}
-
-		upsertedCount = result.RowsAffected
-	}
-
-	return upsertedCount, nil
-}
-
+// GetTickerInstruments gets the ticker instruments
 func (r *Repository) GetTickerInstruments(userID string) ([]TickerInstrument, error) {
 	var tickerInstruments []TickerInstrument
 	err := r.DB.Where("user_id = ?", userID).Find(&tickerInstruments).Error
 	return tickerInstruments, err
 }
 
+// GetTickerInstrumentCount gets the ticker instrument count
 func (r *Repository) GetTickerInstrumentCount(userID string) (int64, error) {
 	var count int64
 	err := r.DB.Model(&TickerInstrument{}).Where("user_id = ?", userID).Count(&count).Error
 	return count, err
 }
 
+// DeleteTickerInstruments deletes the ticker instruments
 func (r *Repository) DeleteTickerInstruments(userID string, instruments []string) (int64, error) {
 	result := r.DB.Where("user_id = ? AND instrument IN ?", userID, instruments).Delete(&TickerInstrument{})
 	return result.RowsAffected, result.Error
@@ -193,6 +111,7 @@ func (r *Repository) DeleteTickerInstruments(userID string, instruments []string
 // --------------------------------------------
 // TickerData func's grouped together
 // --------------------------------------------
+// TruncateTickerData truncates the ticker data
 func (r *Repository) TruncateTickerData() error {
 	result := r.DB.Exec(fmt.Sprintf("TRUNCATE TABLE %s", TickerDataTableName))
 	if result.Error != nil {
@@ -243,6 +162,7 @@ func (r *Repository) UpsertTickerData(tickerData []TickerData) error {
 // --------------------------------------------
 // TickerLog func's grouped together
 // --------------------------------------------
+// log logs a message
 func (r *Repository) log(level LogLevel, eventType, message string) error {
 	timestamp := time.Now()
 	log := TickerLog{

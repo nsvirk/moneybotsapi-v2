@@ -15,8 +15,6 @@ import (
 	"gorm.io/gorm"
 )
 
-var ServerLogsTableName = "_server_logs"
-
 func main() {
 	// Setup logger
 	defer zaplogger.Sync()
@@ -76,7 +74,7 @@ func main() {
 // startServer starts the Echo server on the specified port
 func startServer(e *echo.Echo, cfg *config.Config, db *gorm.DB) {
 	// Initialize the logger - logs will be stored in the database
-	logger, err := logger.New(db, ServerLogsTableName)
+	logger, err := logger.New(db, "MAIN")
 	if err != nil {
 		panic(err)
 	}

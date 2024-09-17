@@ -10,9 +10,9 @@ import (
 )
 
 func ConnectRedis(cfg *config.Config) (*redis.Client, error) {
-
 	zaplogger.Info(config.SingleLine)
 	zaplogger.Info("Connecting to Redis")
+	zaplogger.Info(config.SingleLine)
 
 	// Setup Redis
 	redisOpts, err := redis.ParseURL(cfg.RedisUrl)

@@ -12,7 +12,7 @@ import (
 
 	"github.com/labstack/echo/v4"
 	kiteticker "github.com/nsvirk/gokiteticker"
-	"github.com/nsvirk/moneybotsapi/api/instrument"
+	"github.com/nsvirk/moneybotsapi/services/instrument"
 	"gorm.io/gorm"
 )
 

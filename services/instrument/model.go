@@ -1,5 +1,5 @@
-// File: github.com/nsvirk/moneybotsapi/instrument/model.go
-
+// Package instrument manages the Kite API instruments
+// model.go - Data models and structures
 package instrument
 
 import "time"

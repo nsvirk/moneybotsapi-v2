@@ -5,12 +5,12 @@ import (
 	"strings"
 
 	"github.com/labstack/echo/v4"
-	"github.com/nsvirk/moneybotsapi/api/session"
+	"github.com/nsvirk/moneybotsapi/services/session"
 	"github.com/nsvirk/moneybotsapi/shared/response"
 )
 
 // AuthMiddleware creates a new authorization middleware
-func AuthMiddleware(sessionService *session.Service) echo.MiddlewareFunc {
+func AuthMiddleware(sessionService *session.SessionService) echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
 			auth := c.Request().Header.Get("Authorization")

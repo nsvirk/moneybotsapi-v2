@@ -6,7 +6,7 @@ import (
 	"net/http"
 
 	"github.com/labstack/echo/v4"
-	"github.com/nsvirk/moneybotsapi/api/ticker"
+	"github.com/nsvirk/moneybotsapi/services/ticker"
 	"github.com/nsvirk/moneybotsapi/shared/response"
 )
 

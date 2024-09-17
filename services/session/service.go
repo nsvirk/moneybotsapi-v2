@@ -1,63 +1,58 @@
+// Package session handles the API for session operations
 package session
 
 import (
 	"fmt"
-	"log"
 
 	kitesession "github.com/nsvirk/gokitesession"
 	"github.com/nsvirk/moneybotsapi/shared/logger"
+	"github.com/nsvirk/moneybotsapi/shared/zaplogger"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 )
 
-var SessionLogsTableName = "_session_logs"
-
-type Service struct {
+type SessionService struct {
 	repo        *Repository
 	kiteSession *kitesession.Client
 	logger      *logger.Logger
 }
 
-func NewService(db *gorm.DB) *Service {
-	logger, err := logger.New(db, SessionLogsTableName)
+// NewService creates a new service for the session API
+func NewService(db *gorm.DB) *SessionService {
+	logger, err := logger.New(db, "SESSION SERVICE")
 	if err != nil {
-		log.Fatalf("failed to create cron logger: %v", err)
+		zaplogger.Error("failed to create session logger", zaplogger.Fields{"error": err})
 	}
-	return &Service{
+	return &SessionService{
 		repo:        NewRepository(db),
 		kiteSession: kitesession.New(),
 		logger:      logger,
 	}
 }
 
-type LoginRequest struct {
-	UserID     string `json:"user_id"`
-	Password   string `json:"password"`
-	TOTPSecret string `json:"totp_secret"`
-}
-
-func (s *Service) GenerateSession(req LoginRequest) (SessionModel, error) {
-	if req.UserID == "" || req.Password == "" || req.TOTPSecret == "" {
+// GenerateSession generates a new session for the given user
+func (s *SessionService) GenerateSession(userId, password, totpSecret string) (SessionModel, error) {
+	if userId == "" || password == "" || totpSecret == "" {
 		return SessionModel{}, fmt.Errorf("user_id, password, and totp_secret are required")
 	}
 
-	totpValue, err := kitesession.GenerateTOTPValue(req.TOTPSecret)
+	totpValue, err := kitesession.GenerateTOTPValue(totpSecret)
 	if err != nil {
 		s.logger.Error("Failed to generate TOTP value", map[string]interface{}{
-			"user_id":         req.UserID,
-			"len_totp_secret": len(req.TOTPSecret),
+			"user_id":         userId,
+			"len_totp_secret": len(totpSecret),
 			"error":           err,
 		})
 		return SessionModel{}, fmt.Errorf("failed to generate TOTP value: %v", err)
 	}
 
-	existingSession, err := s.repo.GetSessionByUserID(req.UserID)
+	existingSession, err := s.repo.GetSessionByUserID(userId)
 	if err == nil {
-		if err := bcrypt.CompareHashAndPassword([]byte(existingSession.HashedPassword), []byte(req.Password)); err == nil {
+		if err := bcrypt.CompareHashAndPassword([]byte(existingSession.HashedPassword), []byte(password)); err == nil {
 			isValid, err := s.kiteSession.CheckEnctokenValid(existingSession.Enctoken)
 			if err == nil && isValid {
 				s.logger.Info("Session exists", map[string]interface{}{
-					"user_id":    req.UserID,
+					"user_id":    userId,
 					"enctoken":   fmt.Sprintf("%v***", existingSession.Enctoken[:4]),
 					"login_time": existingSession.LoginTime,
 				})
@@ -66,22 +61,22 @@ func (s *Service) GenerateSession(req LoginRequest) (SessionModel, error) {
 		}
 	}
 
-	session, err := s.kiteSession.GenerateSession(req.UserID, req.Password, totpValue)
+	session, err := s.kiteSession.GenerateSession(userId, password, totpValue)
 	if err != nil {
 		s.logger.Error("Failed to generate session", map[string]interface{}{
-			"user_id":    req.UserID,
-			"password":   fmt.Sprintf("%v***", req.Password[:4]),
+			"user_id":    userId,
+			"password":   fmt.Sprintf("%v***", password[:4]),
 			"totp_value": totpValue,
 			"error":      err,
 		})
 		return SessionModel{}, fmt.Errorf("login failed: %v", err)
 	}
 
-	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
 		s.logger.Error("Failed to hash password", map[string]interface{}{
-			"user_id":  req.UserID,
-			"password": fmt.Sprintf("%v***", req.Password[:4]),
+			"user_id":  userId,
+			"password": fmt.Sprintf("%v***", password[:4]),
 			"error":    err,
 		})
 		return SessionModel{}, fmt.Errorf("failed to hash password: %v", err)
@@ -107,7 +102,7 @@ func (s *Service) GenerateSession(req LoginRequest) (SessionModel, error) {
 	}
 
 	s.logger.Info("Session generated", map[string]interface{}{
-		"user_id":    req.UserID,
+		"user_id":    userId,
 		"enctoken":   fmt.Sprintf("%v***", newSession.Enctoken[:4]),
 		"login_time": newSession.LoginTime,
 	})
@@ -115,7 +110,8 @@ func (s *Service) GenerateSession(req LoginRequest) (SessionModel, error) {
 	return newSession, nil
 }
 
-func (s *Service) GenerateTOTP(totpSecret string) (string, error) {
+// GenerateTOTP generates a TOTP value for the given secret
+func (s *SessionService) GenerateTOTP(totpSecret string) (string, error) {
 	if totpSecret == "" {
 		return "", fmt.Errorf("totp_secret is required")
 	}
@@ -123,7 +119,8 @@ func (s *Service) GenerateTOTP(totpSecret string) (string, error) {
 	return kitesession.GenerateTOTPValue(totpSecret)
 }
 
-func (s *Service) CheckSessionValid(enctoken string) (bool, error) {
+// CheckSessionValid checks if the given enctoken is valid
+func (s *SessionService) CheckSessionValid(enctoken string) (bool, error) {
 	if enctoken == "" {
 		return false, fmt.Errorf("enctoken is required")
 	}
@@ -132,7 +129,8 @@ func (s *Service) CheckSessionValid(enctoken string) (bool, error) {
 }
 
 // Used by the AuthMiddleware to verify the session
-func (s *Service) VerifySession(userID, enctoken string) (*SessionModel, error) {
+// VerifySession verifies the session for the given user and enctoken
+func (s *SessionService) VerifySession(userID, enctoken string) (*SessionModel, error) {
 	session, err := s.repo.GetSessionByUserID(userID)
 	if err != nil {
 		return nil, err

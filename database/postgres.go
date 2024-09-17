@@ -5,10 +5,11 @@ package database
 import (
 	"fmt"
 
-	"github.com/nsvirk/moneybotsapi/api/instrument"
-	"github.com/nsvirk/moneybotsapi/api/session"
-	"github.com/nsvirk/moneybotsapi/api/ticker"
 	"github.com/nsvirk/moneybotsapi/config"
+	"github.com/nsvirk/moneybotsapi/services/index"
+	"github.com/nsvirk/moneybotsapi/services/instrument"
+	"github.com/nsvirk/moneybotsapi/services/session"
+	"github.com/nsvirk/moneybotsapi/services/ticker"
 	"github.com/nsvirk/moneybotsapi/shared/zaplogger"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -22,6 +23,7 @@ var SchemaName = "api"
 func ConnectPostgres(cfg *config.Config) (*gorm.DB, error) {
 	zaplogger.Info(config.SingleLine)
 	zaplogger.Info("Initializing Postgres")
+	zaplogger.Info(config.SingleLine)
 
 	// Set up GORM logger
 	var logLevel logger.LogLevel
@@ -80,6 +82,7 @@ func autoMigrate(db *gorm.DB) error {
 	}{
 		{session.SessionsTableName, &session.SessionModel{}},
 		{instrument.InstrumentsTableName, &instrument.InstrumentModel{}},
+		{index.IndexTableName, &index.IndexModel{}},
 		{ticker.TickerInstrumentsTableName, &ticker.TickerInstrument{}},
 		{ticker.TickerLogTableName, &ticker.TickerLog{}},
 		{ticker.TickerDataTableName, &ticker.TickerData{}},

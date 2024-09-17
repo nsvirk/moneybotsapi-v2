@@ -10,12 +10,15 @@ import (
 	"time"
 
 	kiteticker "github.com/nsvirk/gokiteticker"
+	"github.com/nsvirk/moneybotsapi/services/index"
+	"github.com/nsvirk/moneybotsapi/services/instrument"
+	"github.com/nsvirk/moneybotsapi/shared/logger"
+	"github.com/nsvirk/moneybotsapi/shared/zaplogger"
 	"github.com/redis/go-redis/v9"
 
 	"gorm.io/gorm"
 )
 
-// Kiteticker
 const tickerReconnectMaxRetries = 10 // 10 retries
 
 // TickerService
@@ -27,39 +30,51 @@ const (
 	monitorInterval                 = 10 * time.Second
 )
 
-type Service struct {
-	repo        *Repository
-	redisClient *redis.Client
-	ticker      *kiteticker.Ticker
-	mu          sync.Mutex
-	isRunning   bool
-	instruments map[uint32]string
-	tickChannel chan kiteticker.Tick
-	ctx         context.Context
-	cancel      context.CancelFunc
+type TickerService struct {
+	repo              *Repository
+	redisClient       *redis.Client
+	ticker            *kiteticker.Ticker
+	mu                sync.Mutex
+	isRunning         bool
+	instruments       map[uint32]string
+	tickChannel       chan kiteticker.Tick
+	ctx               context.Context
+	cancel            context.CancelFunc
+	instrumentService *instrument.InstrumentService
+	indexService      *index.IndexService
+	logger            *logger.Logger
 }
 
-func NewService(db *gorm.DB, redisClient *redis.Client) *Service {
+// NewService creates a new TickerService
+func NewService(db *gorm.DB, redisClient *redis.Client) *TickerService {
+	logger, err := logger.New(db, "SESSION SERVICE")
+	if err != nil {
+		zaplogger.Error("failed to create ticker logger", zaplogger.Fields{"error": err})
+	}
 	ctx, cancel := context.WithCancel(context.Background())
-	return &Service{
-		repo:        NewRepository(db),
-		redisClient: redisClient,
-		isRunning:   false,
-		instruments: make(map[uint32]string),
-		tickChannel: make(chan kiteticker.Tick, channelCapacity),
-		ctx:         ctx,
-		cancel:      cancel,
+	return &TickerService{
+		repo:              NewRepository(db),
+		redisClient:       redisClient,
+		isRunning:         false,
+		instruments:       make(map[uint32]string),
+		tickChannel:       make(chan kiteticker.Tick, channelCapacity),
+		ctx:               ctx,
+		cancel:            cancel,
+		instrumentService: instrument.NewInstrumentService(db),
+		indexService:      index.NewIndexService(db),
+		logger:            logger,
 	}
 }
 
-func (s *Service) Start(userID, enctoken string) error {
+// Start starts the ticker service
+func (s *TickerService) Start(userID, enctoken string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	// Stop the ticker if already runnin
 	if s.isRunning {
 		s.Stop(userID)
-		// return fmt.Errorf("ticker is already running")
+		time.Sleep(2 * time.Second)
 	}
 
 	// Get all ticker instruments
@@ -104,7 +119,8 @@ func (s *Service) Start(userID, enctoken string) error {
 	return nil
 }
 
-func (s *Service) Stop(userID string) error {
+// Stop stops the ticker service
+func (s *TickerService) Stop(userID string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -141,16 +157,17 @@ func (s *Service) Stop(userID string) error {
 	return nil
 }
 
-func (s *Service) Restart(userID, enctoken string) error {
+func (s *TickerService) Restart(userID, enctoken string) error {
 	return s.Start(userID, enctoken)
 }
 
 // Status returns the current status of the ticker
-func (s *Service) Status() bool {
+func (s *TickerService) Status() bool {
 	return s.isRunning
 }
 
-func (s *Service) initializeTicker(userID, enctoken string) error {
+// initializeTicker initializes the ticker
+func (s *TickerService) initializeTicker(userID, enctoken string) error {
 	s.ticker = kiteticker.New(userID, enctoken)
 
 	s.SetReconnectMaxRetries(tickerReconnectMaxRetries)
@@ -173,11 +190,12 @@ func (s *Service) initializeTicker(userID, enctoken string) error {
 		}
 	}
 }
-func (s *Service) SetReconnectMaxRetries(retries int) {
+func (s *TickerService) SetReconnectMaxRetries(retries int) {
 	s.ticker.SetReconnectMaxRetries(retries)
 }
 
-func (s *Service) setupTickerCallbacks() {
+// setupTickerCallbacks sets up the ticker callbacks
+func (s *TickerService) setupTickerCallbacks() {
 	s.ticker.OnTick(func(tick kiteticker.Tick) {
 		// fmt.Println(tick)
 		s.tickChannel <- tick
@@ -206,7 +224,7 @@ func (s *Service) setupTickerCallbacks() {
 	})
 }
 
-func (s *Service) processTicks() {
+func (s *TickerService) processTicks() {
 	var postgresData []TickerData
 	ticker := time.NewTicker(flushInterval)
 	defer ticker.Stop()
@@ -227,7 +245,8 @@ func (s *Service) processTicks() {
 	}
 }
 
-func (s *Service) processTick(tick kiteticker.Tick, postgresData *[]TickerData) {
+// processTick processes the tick
+func (s *TickerService) processTick(tick kiteticker.Tick, postgresData *[]TickerData) {
 
 	instrument, ok := s.instruments[tick.InstrumentToken]
 	if !ok {
@@ -288,7 +307,8 @@ func (s *Service) processTick(tick kiteticker.Tick, postgresData *[]TickerData) 
 	*postgresData = append(*postgresData, tickerData)
 }
 
-func (s *Service) flushData(postgresData *[]TickerData) {
+// flushData flushes the data to postgres
+func (s *TickerService) flushData(postgresData *[]TickerData) {
 
 	if len(*postgresData) > 0 {
 		if err := s.repo.UpsertTickerData(*postgresData); err != nil {
@@ -298,7 +318,8 @@ func (s *Service) flushData(postgresData *[]TickerData) {
 	}
 }
 
-func (s *Service) flushTicks() {
+// flushTicks flushes the ticks to postgres
+func (s *TickerService) flushTicks() {
 	ticker := time.NewTicker(flushInterval)
 	defer ticker.Stop()
 
@@ -312,33 +333,30 @@ func (s *Service) flushTicks() {
 	}
 }
 
-func (s *Service) TruncateTickerData() error {
+// TruncateTickerData truncates the ticker data
+func (s *TickerService) TruncateTickerData() error {
 	return s.repo.TruncateTickerData()
 }
 
-func (s *Service) AddTickerInstruments(userID string, instruments []string) (map[string]interface{}, error) {
-	// get instrument tokens for the given instruments
-	instrumentTokens, notFoundInstruments, err := s.getInstrumentTokens(instruments)
+// AddTickerInstruments adds the ticker instruments
+func (s *TickerService) AddTickerInstruments(userID string, instruments []string) (map[string]interface{}, error) {
+
+	// make instrumentsTokensMap using instrument service
+	instrumentsTokensMap, err := s.instrumentService.GetInstrumentToTokenMap(instruments)
 	if err != nil {
 		return nil, err
 	}
 
-	if len(instrumentTokens) == 0 {
-		return nil, fmt.Errorf("no valid instruments found")
+	// find missing instruments
+	missingInstruments := make([]string, 0)
+	for _, instrument := range instruments {
+		if _, ok := instrumentsTokensMap[instrument]; !ok {
+			missingInstruments = append(missingInstruments, instrument)
+		}
 	}
 
-	// convert instruments and instrumeent_tokens to TickerInstrument type
-	tickerInstruments := make([]TickerInstrument, 0, len(instrumentTokens))
-	for instrument, instrumentToken := range instrumentTokens {
-		tickerInstruments = append(tickerInstruments, TickerInstrument{
-			UserID:          userID,
-			Instrument:      instrument,
-			InstrumentToken: instrumentToken,
-			UpdatedAt:       time.Now(),
-		})
-	}
-
-	upsertedCount, err := s.repo.AddTickerInstruments(userID, tickerInstruments)
+	// upsert the instruments
+	insertedCount, updatedCount, err := s.repo.UpsertTickerInstruments(userID, instrumentsTokensMap)
 	if err != nil {
 		return nil, err
 	}
@@ -349,64 +367,70 @@ func (s *Service) AddTickerInstruments(userID string, instruments []string) (map
 	}
 
 	response := map[string]interface{}{
-		"upserted": upsertedCount,
+		"inserted": insertedCount,
+		"updated":  updatedCount,
+		"missing":  len(missingInstruments),
 		"total":    totalCount,
 	}
 
-	if len(notFoundInstruments) > 0 {
-		response["missing"] = notFoundInstruments
+	if len(missingInstruments) > 0 {
+		response["missing_instruments"] = missingInstruments
 	}
 
 	return response, nil
 }
 
-func (s *Service) DeleteTickerInstruments(userID string, instruments []string) (int64, error) {
+func (s *TickerService) DeleteTickerInstruments(userID string, instruments []string) (int64, error) {
 	return s.repo.DeleteTickerInstruments(userID, instruments)
 }
 
-func (s *Service) GetTickerInstruments(userID string) ([]TickerInstrument, error) {
+// GetTickerInstruments gets the ticker instruments
+func (s *TickerService) GetTickerInstruments(userID string) ([]TickerInstrument, error) {
 	return s.repo.GetTickerInstruments(userID)
 }
 
-// func (s *Service) UpsertTickerInstruments(userID string, instruments []TickerInstrument) (int, int, error) {
-// 	return s.repo.UpsertTickerInstruments(userID, instruments)
-// }
-
-func (s *Service) GetTickerInstrumentCount(userID string) (int64, error) {
+// GetTickerInstrumentCount gets the ticker instrument count
+func (s *TickerService) GetTickerInstrumentCount(userID string) (int64, error) {
 	return s.repo.GetTickerInstrumentCount(userID)
 }
 
-func (s *Service) getInstrumentTokens(instruments []string) (map[string]uint32, []string, error) {
-	instrumentTokens := make(map[string]uint32)
-	var notFoundInstruments []string
-
-	for _, instrument := range instruments {
-		parts := strings.Split(instrument, ":")
-		if len(parts) != 2 {
-			notFoundInstruments = append(notFoundInstruments, instrument)
-			continue
-		}
-		exchange, symbol := parts[0], parts[1]
-		token, err := s.repo.GetInstrumentToken(exchange, symbol)
-		if err != nil {
-			notFoundInstruments = append(notFoundInstruments, instrument)
-		} else {
-			instrumentTokens[instrument] = token
-		}
-	}
-
-	return instrumentTokens, notFoundInstruments, nil
-}
-
-func (s *Service) TruncateTickerInstruments() (int64, error) {
+// TruncateTickerInstruments truncates the ticker instruments
+func (s *TickerService) TruncateTickerInstruments() (int64, error) {
 	return s.repo.TruncateTickerInstruments()
 }
 
-func (s *Service) UpsertQueriedInstruments(userID, exchange, tradingsymbol, expiry, strike, segment string) (map[string]interface{}, error) {
-	return s.repo.UpsertQueriedInstruments(userID, exchange, tradingsymbol, expiry, strike, segment)
+// UpsertQueriedInstruments upserts the queried instruments
+func (s *TickerService) UpsertQueriedInstruments(userID, exchange, tradingsymbol, expiry, strike, segment string) (map[string]interface{}, error) {
+	// query instrumetns using instruments service
+	queriedInstruments, err := s.instrumentService.QueryInstruments(exchange, tradingsymbol, expiry, strike, segment)
+	if err != nil {
+		return nil, err
+	}
+
+	// convert queried instruments to []tokens
+	instrumentsTokenMap := make(map[string]uint32, len(queriedInstruments))
+	for _, instrument := range queriedInstruments {
+		instrumentsTokenMap[instrument.Exchange+":"+instrument.Tradingsymbol] = instrument.InstrumentToken
+	}
+
+	// upsert the queried instruments
+	insertedCount, updatedCount, err := s.repo.UpsertTickerInstruments(userID, instrumentsTokenMap)
+	if err != nil {
+		return nil, err
+	}
+
+	response := map[string]interface{}{
+		"user_id":  userID,
+		"queried":  len(queriedInstruments),
+		"inserted": insertedCount,
+		"updated":  updatedCount,
+	}
+
+	return response, nil
 }
 
-func (s *Service) GetNFOFilterMonths() (string, string, string) {
+// GetNFOFilterMonths gets the NFO filter months
+func (s *TickerService) GetNFOFilterMonths() (string, string, string) {
 	now := time.Now()
 	month0 := strings.ToUpper(now.Format("06Jan"))
 	month1 := strings.ToUpper(now.AddDate(0, 1, 0).Format("06Jan"))
@@ -414,7 +438,8 @@ func (s *Service) GetNFOFilterMonths() (string, string, string) {
 	return month0, month1, month2
 }
 
-func (s *Service) monitorTickerChannel() {
+// monitorTickerChannel monitors the ticker channel
+func (s *TickerService) monitorTickerChannel() {
 	ticker := time.NewTicker(monitorInterval)
 	defer ticker.Stop()
 
