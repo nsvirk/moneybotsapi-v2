@@ -47,9 +47,17 @@ func (s *InstrumentService) UpdateInstruments() (int, error) {
 	lastUpdatedAt, err := s.state.Get("instruments_updated_at")
 	if err == nil {
 		if !s.isUpdateInstrumentsRequired(lastUpdatedAt) {
+			// update log with logger
+			s.logger.Info("Instruments update not required", map[string]interface{}{
+				"lastUpdatedAt": lastUpdatedAt,
+			})
 			return 0, nil
 		}
 	}
+	// update log with logger
+	s.logger.Info("Instruments update required", map[string]interface{}{
+		"lastUpdatedAt": lastUpdatedAt,
+	})
 
 	// get instruments from kite
 	resp, err := http.Get("https://api.kite.trade/instruments")
@@ -103,8 +111,32 @@ func (s *InstrumentService) UpdateInstruments() (int, error) {
 		totalInserted += inserted
 	}
 
-	// update last update time
-	s.state.Set("instruments_updated_at", time.Now().Format("2006-01-02 15:04:05"))
+	// update state after all instruments have been updated
+	if err := s.state.Set("instruments_updated_at", time.Now().Format("2006-01-02 15:04:05")); err != nil {
+		s.logger.Error("Failed to update state", map[string]interface{}{
+			"error": err,
+		})
+		return 0, fmt.Errorf("failed to update state: %v", err)
+	}
+
+	// update log with logger
+	s.logger.Info("Instruments updated", map[string]interface{}{
+		"totalInserted": totalInserted,
+	})
+
+	// get instruments record count
+	recordCount, err := s.repo.GetInstrumentsRecordCount()
+	if err != nil {
+		s.logger.Error("Failed to get instruments record count", map[string]interface{}{
+			"error": err,
+		})
+		return 0, fmt.Errorf("failed to get instruments record count: %v", err)
+	}
+
+	// insert record count in logs
+	s.logger.Info("Instruments record count", map[string]interface{}{
+		"recordCount": recordCount,
+	})
 
 	return totalInserted, nil
 }

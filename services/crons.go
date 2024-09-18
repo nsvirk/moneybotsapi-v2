@@ -65,21 +65,24 @@ func (cs *CronService) Start() {
 	zaplogger.Info("Initializing CronService")
 	zaplogger.Info(config.SingleLine)
 
-	// Add your scheduled jobs here
+	// ------------------------------------------------------------
+	// Add your SCHEDULED jobs here
+	// ------------------------------------------------------------
 	cs.addScheduledJob("API Instruments UPDATE job", cs.apiInstrumentsUpdateJob, "0 8 * * 1-5")      // Once at 08:00am, Mon-Fri
 	cs.addScheduledJob("TickerInstruments UPDATE job", cs.tickerInstrumentsUpdateJob, "1 8 * * 1-5") // Once at 08:01am, Mon-Fri
 	cs.addScheduledJob("API Indices UPDATE job", cs.apiIndicesUpdateJob, "2 8 * * 1-5")              // Once at 08:02am, Mon-Fri
+	cs.addScheduledJob("Ticker START job", cs.tickerStartJob, "0 9 * * 1-5")                         // Once at 09:00am, Mon-Fri
+	cs.addScheduledJob("Ticker STOP job", cs.tickerStopJob, "45 23 * * 1-5")                         // Once at 11:45pm, Mon-Fri
 
-	// Ticker starts at 9:00am and stops at 11:45pm - Covers NSE and MCX trading hours
-	cs.addScheduledJob("Ticker START job", cs.tickerStartJob, "0 9 * * 1-5") // Once at 09:00am, Mon-Fri
-	cs.addScheduledJob("Ticker STOP job", cs.tickerStopJob, "45 23 * * 1-5") // Once at 11:45pm, Mon-Fri
-
-	// Add your startup jobs here
-	cs.addStartupJob("TickerData TRUNCATE job", cs.tickerDataTruncateJob, 1*time.Second)
-	cs.addStartupJob("ApiInstruments UPDATE job", cs.apiInstrumentsUpdateJob, 3*time.Second)
-	cs.addStartupJob("ApiIndices UPDATE job", cs.apiIndicesUpdateJob, 8*time.Second)
-	cs.addStartupJob("TickerInstruments UPDATE job", cs.tickerInstrumentsUpdateJob, 30*time.Second)
-	cs.addStartupJob("Ticker START job", cs.tickerStartJob, 35*time.Second)
+	// ------------------------------------------------------------
+	// Add your STARTUP jobs here
+	// ------------------------------------------------------------
+	cs.addStartupJob("ApiInstruments UPDATE job", cs.apiInstrumentsUpdateJob, 1*time.Second)
+	cs.addStartupJob("ApiIndices UPDATE job", cs.apiIndicesUpdateJob, 5*time.Second)
+	cs.addStartupJob("TickerInstruments UPDATE job", cs.tickerInstrumentsUpdateJob, 20*time.Second)
+	cs.addStartupJob("TickerData TRUNCATE job", cs.tickerDataTruncateJob, 25*time.Second)
+	cs.addStartupJob("Ticker START job", cs.tickerStartJob, 28*time.Second)
+	// ------------------------------------------------------------
 
 	// Log the initialization to database
 	cs.logger.Info("Initializing CronService", map[string]interface{}{
@@ -376,7 +379,14 @@ func (cs *CronService) tickerInstrumentsUpdateJob() {
 	}
 
 	// Add provision for upserting selected indices
-	indices := []string{"NSE:NIFTY 50", "NSE:NIFTY 100", "NSE:NIFTY 200", "NSE:NIFTY 500", "NSE:NIFTY BANK", "NSE:NIFTY NEXT 50"}
+	indices, err := cs.indexService.GetNSEIndexNamesFromNSEIndicesFileMap()
+	if err != nil {
+		zaplogger.Error("TickerInstruments get NSE indices failed:")
+		zaplogger.Error("  * error : " + err.Error())
+		zaplogger.Info("")
+		return
+	}
+
 	for _, indexName := range indices {
 
 		indexInstruments, err := cs.indexService.GetNSEIndexInstruments(indexName)

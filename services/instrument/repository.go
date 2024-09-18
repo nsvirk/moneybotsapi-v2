@@ -73,6 +73,16 @@ func (r *Repository) InsertInstruments(records [][]string) (int, error) {
 	return int(result.RowsAffected), nil
 }
 
+// GetInstrumentsRecordCount returns the number of records in the instruments table
+func (r *Repository) GetInstrumentsRecordCount() (int64, error) {
+	var count int64
+	err := r.DB.Table(InstrumentsTableName).Count(&count).Error
+	if err != nil {
+		return 0, fmt.Errorf("failed to get instruments record count: %v", err)
+	}
+	return count, nil
+}
+
 // QueryInstruments queries the instruments table
 func (r *Repository) QueryInstruments(exchange, tradingsymbol, expiry, strike, segment string) ([]InstrumentModel, error) {
 	query := r.DB.Model(&InstrumentModel{})

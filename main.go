@@ -63,8 +63,8 @@ func main() {
 	cronService := services.NewCronService(e, cfg, db, redisClient)
 	cronService.Start()
 
-	// Setup and start ticks
-	go services.PublishTicksToRedisChannel(db, redisClient, cfg.PostgresDsn)
+	// // Setup and start ticks
+	// go services.PublishTicksToRedisChannel(db, redisClient, cfg.PostgresDsn)
 
 	// Start the server
 	startServer(e, cfg, db)

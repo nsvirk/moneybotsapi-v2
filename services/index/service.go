@@ -14,22 +14,29 @@ import (
 	"gorm.io/gorm"
 )
 
-// NSEIndicesURLMap is a map of NSE indices and their corresponding URLs
-var NSEIndicesURLMap = map[string]string{
-	"NSE:NIFTY 50":      "https://archives.nseindia.com/content/indices/ind_nifty50list.csv",
-	"NSE:NIFTY 100":     "https://archives.nseindia.com/content/indices/ind_nifty100list.csv",
-	"NSE:NIFTY 200":     "https://archives.nseindia.com/content/indices/ind_nifty200list.csv",
-	"NSE:NIFTY 500":     "https://archives.nseindia.com/content/indices/ind_nifty500list.csv",
-	"NSE:NIFTY BANK":    "https://archives.nseindia.com/content/indices/ind_niftybanklist.csv",
-	"NSE:NIFTY NEXT 50": "https://archives.nseindia.com/content/indices/ind_niftynext50list.csv",
-	// "NSE:NIFTY MIDCAP 50":    "https://archives.nseindia.com/content/indices/ind_niftymidcap50list.csv",
-	// "NSE:NIFTY MIDCAP 100":   "https://archives.nseindia.com/content/indices/ind_niftymidcap100list.csv",
-	// "NSE:NIFTY SMALLCAP 100": "https://archives.nseindia.com/content/indices/ind_niftysmallcap100list.csv",
-	// "NSE:NIFTY IT":           "https://archives.nseindia.com/content/indices/ind_niftyitlist.csv",
-	// "NSE:NIFTY AUTO":         "https://archives.nseindia.com/content/indices/ind_niftyautolist.csv",
-	// "NSE:NIFTY FMCG":         "https://archives.nseindia.com/content/indices/ind_niftyfmcglist.csv",
-	// "NSE:NIFTY PHARMA":       "https://archives.nseindia.com/content/indices/ind_niftypharmalist.csv",
-	// "NSE:NIFTY METAL":        "https://archives.nseindia.com/content/indices/ind_niftymetallist.csv",
+var NSEIndicesBaseURL = "https://niftyindices.com/IndexConstituent/"
+
+var NSEIndicesFileMap = map[string]string{
+	"NSE:NIFTY 50":                 "ind_nifty50list.csv",
+	"NSE:NIFTY NEXT 50":            "ind_niftynext50list.csv",
+	"NSE:NIFTY 100":                "ind_nifty100list.csv",
+	"NSE:NIFTY 200":                "ind_nifty200list.csv",
+	"NSE:NIFTY TOTAL MARKET":       "ind_niftytotalmarket_list.csv",
+	"NSE:NIFTY 500":                "ind_nifty500list.csv",
+	"NSE:NIFTY MIDCAP 50":          "ind_niftymidcap50list.csv",
+	"NSE:NIFTY MIDCAP 100":         "ind_niftymidcap100list.csv",
+	"NSE:NIFTY SMALLCAP 100":       "ind_niftysmallcap100list.csv",
+	"NSE:NIFTY AUTO":               "ind_niftyautolist.csv",
+	"NSE:NIFTY BANK":               "ind_niftybanklist.csv",
+	"NSE:NIFTY FINANCIAL SERVICES": "ind_niftyfinancelist.csv",
+	"NSE:NIFTY HEALTHCARE":         "ind_niftyhealthcarelist.csv",
+	"NSE:NIFTY IT":                 "ind_niftyitlist.csv",
+	"NSE:NIFTY FMCG":               "ind_niftyfmcglist.csv",
+	"NSE:NIFTY METAL":              "ind_niftymetallist.csv",
+	"NSE:NIFTY PHARMA":             "ind_niftypharmalist.csv",
+	"NSE:NIFTY REALTY":             "ind_niftyrealtylist.csv",
+	"NSE:NIFTY CONSUMER DURABLES":  "ind_niftyconsumerdurableslist.csv",
+	"NSE:NIFTY OIL GAS":            "ind_niftyoilgaslist.csv",
 }
 
 // IndexService is the service for managing indices
@@ -65,9 +72,17 @@ func (s *IndexService) UpdateNSEIndices() (int64, error) {
 	lastUpdatedAt, err := s.state.Get("indices_updated_at")
 	if err == nil {
 		if !s.isUpdateIndicesRequired(lastUpdatedAt) {
+			// update log with logger
+			s.logger.Info("Indices update not required", map[string]interface{}{
+				"lastUpdatedAt": lastUpdatedAt,
+			})
 			return 0, nil
 		}
 	}
+	// update log with logger
+	s.logger.Info("Indices update required", map[string]interface{}{
+		"lastUpdatedAt": lastUpdatedAt,
+	})
 
 	// truncate table
 	if err := s.repo.TruncateIndices(); err != nil {
@@ -78,36 +93,48 @@ func (s *IndexService) UpdateNSEIndices() (int64, error) {
 	}
 
 	// get instruments for all indices
-	var insertedRecords int64
-	for _, indexName := range s.GetNSEIndexNames() {
+	var totalInserted int64
+	indices, err := s.GetNSEIndexNamesFromNSEIndicesFileMap()
+	if err != nil {
+		s.logger.Error("Failed to get indices", map[string]interface{}{
+			"error": err,
+		})
+		return 0, fmt.Errorf("failed to get indices: %v", err)
+	}
+
+	// update indices
+	for _, index := range indices {
 		// get instruments for index
-		instruments, err := s.FetchNSEIndexInstruments(indexName)
+		indexInstruments, err := s.FetchNSEIndexInstruments(index)
 		if err != nil {
 			s.logger.Error("Failed to get instruments for index", map[string]interface{}{
-				"index_name": indexName,
+				"indexindex": index,
 				"error":      err,
 			})
-			return 0, fmt.Errorf("failed to get instruments for index %s: %v", indexName, err)
+			return 0, fmt.Errorf("failed to get instruments for index %s: %v", index, err)
 		}
 
 		// prepare indexInstruments for InsertIndices
-		indexInstruments := make([]IndexModel, len(instruments))
-		for i, instrument := range instruments {
+		for i, idxInstrument := range indexInstruments {
 			indexInstruments[i] = IndexModel{
-				IndexName:  indexName,
-				Instrument: instrument,
-				CreatedAt:  time.Now(),
+				Index:       index,
+				Instrument:  idxInstrument.Instrument,
+				CompanyName: idxInstrument.CompanyName,
+				Industry:    idxInstrument.Industry,
+				Series:      idxInstrument.Series,
+				ISINCode:    idxInstrument.ISINCode,
+				CreatedAt:   time.Now(),
 			}
 		}
 		count, err := s.repo.InsertIndices(indexInstruments)
 		if err != nil {
 			s.logger.Error("Failed to insert instruments for index", map[string]interface{}{
-				"index_name": indexName,
-				"error":      err,
+				"index": index,
+				"error": err,
 			})
-			return 0, fmt.Errorf("failed to create instruments for index %s: %v", indexName, err)
+			return 0, fmt.Errorf("failed to create instruments for index %s: %v", index, err)
 		}
-		insertedRecords += count
+		totalInserted += count
 
 	}
 
@@ -119,7 +146,26 @@ func (s *IndexService) UpdateNSEIndices() (int64, error) {
 		return 0, fmt.Errorf("failed to update state: %v", err)
 	}
 
-	return insertedRecords, nil
+	// update log with logger
+	s.logger.Info("Indices updated", map[string]interface{}{
+		"totalInserted": totalInserted,
+	})
+
+	// get indices record count
+	recordCount, err := s.repo.GetIndicesRecordCount()
+	if err != nil {
+		s.logger.Error("Failed to get indices record count", map[string]interface{}{
+			"error": err,
+		})
+		return 0, fmt.Errorf("failed to get indices record count: %v", err)
+	}
+
+	// insert record count in logs
+	s.logger.Info("Indices record count", map[string]interface{}{
+		"recordCount": recordCount,
+	})
+
+	return recordCount, nil
 
 }
 
@@ -142,11 +188,15 @@ func (s *IndexService) isUpdateIndicesRequired(lastUpdatedAt string) bool {
 }
 
 // FetchNSEIndexInstruments fetches the instruments for a given NSE index
-func (s *IndexService) FetchNSEIndexInstruments(indexName string) ([]string, error) {
-	url, ok := NSEIndicesURLMap[indexName]
+func (s *IndexService) FetchNSEIndexInstruments(indexName string) ([]IndexModel, error) {
+	// get index csv file name
+	indexCsvFile, ok := NSEIndicesFileMap[indexName]
 	if !ok {
 		return nil, fmt.Errorf("invalid index: %s", indexName)
 	}
+
+	// make url
+	url := fmt.Sprintf("%s%s", NSEIndicesBaseURL, indexCsvFile)
 
 	// -------------------------------------------------------------------------------------------------
 	// make request to index url
@@ -159,8 +209,11 @@ func (s *IndexService) FetchNSEIndexInstruments(indexName string) ([]string, err
 		})
 		return nil, fmt.Errorf("failed to create request for index %s: %v", indexName, err)
 	}
-	req.Header.Add("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36")
-	req.Header.Add("referer", "https://www.nseindia.com/")
+
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
+	req.Header.Set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8")
+	req.Header.Set("Accept-Language", "en-US,en;q=0.5")
+	req.Header.Set("Referer", "https://niftyindices.com/")
 
 	resp, err := s.client.Do(req)
 	if err != nil {
@@ -182,24 +235,38 @@ func (s *IndexService) FetchNSEIndexInstruments(indexName string) ([]string, err
 		return nil, fmt.Errorf("failed to parse CSV for index %s: %v", indexName, err)
 	}
 
-	instruments := make([]string, 0, len(records)-1)
+	indexInstruments := make([]IndexModel, 0, len(records)-1)
 	for _, record := range records[1:] { // Skip header row
-		if len(record) < 3 {
+		// record is [Company Name, Industry, Symbol, Series, ISIN Code]
+		//  sample is 360 ONE WAM Ltd, Financial Services, 360ONE, EQ, INE466L01038
+		if len(record) < 5 {
 			continue
 		}
-		instruments = append(instruments, "NSE:"+record[2]) // Assuming the tradingymbol is in the third column
+		indexInstruments = append(indexInstruments, IndexModel{
+			Index:       indexName,
+			Instrument:  "NSE:" + record[2],
+			CompanyName: record[0],
+			Industry:    record[1],
+			Series:      record[3],
+			ISINCode:    record[4],
+		})
 	}
 
-	return instruments, nil
+	return indexInstruments, nil
+}
+
+// GetNSEIndexNamesFromFileMap fetches the names of all NSE indices from NSEIndicesFileMap
+func (s *IndexService) GetNSEIndexNamesFromNSEIndicesFileMap() ([]string, error) {
+	var indices []string
+	for index := range NSEIndicesFileMap {
+		indices = append(indices, index)
+	}
+	return indices, nil
 }
 
 // GetNSEIndexNames returns the names of all NSE indices
-func (s *IndexService) GetNSEIndexNames() []string {
-	indices := make([]string, 0, len(NSEIndicesURLMap))
-	for index := range NSEIndicesURLMap {
-		indices = append(indices, index)
-	}
-	return indices
+func (s *IndexService) GetNSEIndexNames() ([]string, error) {
+	return s.repo.GetNSEIndexNames()
 }
 
 // GetNSEIndexInstruments fetches the instruments for a given NSE index

@@ -35,6 +35,12 @@ type UpdateInstrumentsResponseData struct {
 	Records   int    `json:"records"`
 }
 
+// UpdateIndicesResponseData is the response data for the UpdateIndices endpoint
+type UpdateIndicesResponseData struct {
+	Timestamp string `json:"timestamp"`
+	Records   int    `json:"records"`
+}
+
 // UpdateInstruments updates the instruments in the database
 func (h *Handler) UpdateInstruments(c echo.Context) error {
 	totalInserted, err := h.InstrumentService.UpdateInstruments()
@@ -45,6 +51,21 @@ func (h *Handler) UpdateInstruments(c echo.Context) error {
 	responseData := UpdateInstrumentsResponseData{
 		Timestamp: time.Now().Format("2006-01-02 15:04:05"),
 		Records:   totalInserted,
+	}
+
+	return response.SuccessResponse(c, responseData)
+}
+
+// UpdateIndices updates the indices in the database
+func (h *Handler) UpdateIndices(c echo.Context) error {
+	totalInserted, err := h.IndexService.UpdateNSEIndices()
+	if err != nil {
+		return response.ErrorResponse(c, http.StatusInternalServerError, "update_error", err.Error())
+	}
+
+	responseData := UpdateIndicesResponseData{
+		Timestamp: time.Now().Format("2006-01-02 15:04:05"),
+		Records:   int(totalInserted),
 	}
 
 	return response.SuccessResponse(c, responseData)
@@ -78,7 +99,10 @@ func (h *Handler) GetIndexInstruments(c echo.Context) error {
 
 // GetIndexNames returns a list of index names
 func (h *Handler) GetIndexNames(c echo.Context) error {
-	indices := h.IndexService.GetNSEIndexNames()
+	indices, err := h.IndexService.GetNSEIndexNames()
+	if err != nil {
+		return response.ErrorResponse(c, http.StatusInternalServerError, "server_error", err.Error())
+	}
 	return response.SuccessResponse(c, indices)
 }
 
