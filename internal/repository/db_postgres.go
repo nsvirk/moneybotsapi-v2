@@ -12,9 +12,6 @@ import (
 	"gorm.io/gorm/logger"
 )
 
-// TableName is the name of the table for instruments
-var SchemaName = "api"
-
 // ConnectPostgres connects to a Postgres database and returns a GORM database object
 func ConnectPostgres(cfg *config.Config) (*gorm.DB, error) {
 	zaplogger.Info(config.SingleLine)
@@ -50,19 +47,19 @@ func ConnectPostgres(cfg *config.Config) (*gorm.DB, error) {
 	zaplogger.Info("  * connected")
 
 	// Create the schema if it doesn't exist
-	createSchemaSql := fmt.Sprintf("CREATE SCHEMA IF NOT EXISTS %s", SchemaName)
+	createSchemaSql := fmt.Sprintf("CREATE SCHEMA IF NOT EXISTS %s", cfg.PostgresSchema)
 	if err := db.Exec(createSchemaSql).Error; err != nil {
 		panic("failed to create schema: " + err.Error())
 	}
-	zaplogger.Info("  * migrating scheme: \"" + SchemaName + "\"")
+	zaplogger.Info("  * migrating scheme: \"" + cfg.PostgresSchema + "\"")
 
 	// AutoMigrate will create tables and add/modify columns
-	if err := autoMigrate(db); err != nil {
+	if err := autoMigrate(db, cfg); err != nil {
 		return nil, fmt.Errorf("failed to auto migrate: %v", err)
 	}
 
 	// Set the ticker data table as unlogged
-	err = setTickerDataTableAsUnlogged(db)
+	err = setTickerDataTableAsUnlogged(db, cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -71,7 +68,7 @@ func ConnectPostgres(cfg *config.Config) (*gorm.DB, error) {
 	return db, nil
 }
 
-func autoMigrate(db *gorm.DB) error {
+func autoMigrate(db *gorm.DB, cfg *config.Config) error {
 	tables := []struct {
 		name  string
 		model interface{}
@@ -86,20 +83,20 @@ func autoMigrate(db *gorm.DB) error {
 
 	zaplogger.Info("  * migrating tables")
 	for _, table := range tables {
-		err := db.Table(SchemaName + "." + table.name).AutoMigrate(&table.model)
+		err := db.Table(cfg.PostgresSchema + "." + table.name).AutoMigrate(&table.model)
 		if err != nil {
 			return fmt.Errorf("failed to auto migrate table: %s, err:%v", table.name, err)
 		}
-		zaplogger.Info("    - \"" + SchemaName + "." + table.name + "\"")
+		zaplogger.Info("    - \"" + cfg.PostgresSchema + "." + table.name + "\"")
 	}
 
 	return nil
 }
 
-func setTickerDataTableAsUnlogged(db *gorm.DB) error {
+func setTickerDataTableAsUnlogged(db *gorm.DB, cfg *config.Config) error {
 	// Set the table as unlogged
 	table := models.TickerDataTableName
-	if err := db.Table(SchemaName + "." + table).Exec("ALTER TABLE " + table + " SET UNLOGGED").Error; err != nil {
+	if err := db.Table(cfg.PostgresSchema + "." + table).Exec("ALTER TABLE " + table + " SET UNLOGGED").Error; err != nil {
 		return fmt.Errorf("failed to set table as unlogged: %v", err)
 	}
 
