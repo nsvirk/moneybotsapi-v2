@@ -13,14 +13,18 @@ import (
 
 // Config represents the application configuration
 type Config struct {
-	APIName              string `env:"MB_API_NAME"`
-	APIVersion           string `env:"MB_API_VERSION"`
+	APIName              string `env:"MB_API_APP_NAME"`
+	APIVersion           string `env:"MB_API_APP_VERSION"`
 	ServerPort           string `env:"MB_API_SERVER_PORT"`
 	ServerLogLevel       string `env:"MB_API_SERVER_LOG_LEVEL"`
 	PostgresDsn          string `env:"MB_API_PG_DSN"`
+	PostgresSchema       string `env:"MB_API_PG_SCHEMA"`
 	PostgresLogLevel     string `env:"MB_API_PG_LOG_LEVEL"`
-	RedisUrl             string `env:"MB_API_REDIS_URL"`
+	RedisHost            string `env:"MB_API_REDIS_HOST"`
+	RedisPort            string `env:"MB_API_REDIS_PORT"`
+	RedisPassword        string `env:"MB_API_REDIS_PASSWORD"`
 	TelegramBotToken     string `env:"MB_API_TELEGRAM_BOT_TOKEN"`
+	TelegramChatID       string `env:"MB_API_TELEGRAM_CHAT_ID"`
 	KitetickerUserID     string `env:"MB_API_KITETICKER_USER_ID"`
 	KitetickerPassword   string `env:"MB_API_KITETICKER_PASSWORD"`
 	KitetickerTotpSecret string `env:"MB_API_KITETICKER_TOTP_SECRET"`
