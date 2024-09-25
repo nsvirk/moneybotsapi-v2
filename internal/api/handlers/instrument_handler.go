@@ -216,18 +216,18 @@ func (h *InstrumentHandler) GetOptionChainNames(c echo.Context) error {
 		return response.ErrorResponse(c, http.StatusBadRequest, "invalid_request", "Invalid `expiry` format")
 	}
 
-	exchangeNames, err := h.InstrumentService.GetOptionChainNames(expiry)
+	instrumentNames, err := h.InstrumentService.GetOptionChainNames(expiry)
 	if err != nil {
 		return response.ErrorResponse(c, http.StatusInternalServerError, "query_error", err.Error())
 	}
 
-	expiryNamesMap := make(map[string][]string)
-	if len(exchangeNames) == 0 {
-		expiryNamesMap[expiry] = []string{}
+	var responseData []string
+	if len(instrumentNames) == 0 {
+		responseData = []string{expiry}
 	} else {
-		expiryNamesMap[expiry] = exchangeNames
+		responseData = instrumentNames
 	}
-	return response.SuccessResponse(c, expiryNamesMap)
+	return response.SuccessResponse(c, responseData)
 }
 
 // GetOptionChainInstruments returns a list of instruments for a given exchange, name and expiry

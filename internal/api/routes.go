@@ -41,17 +41,17 @@ func SetupRoutes(e *echo.Echo, db *gorm.DB, redisClient *redis.Client) {
 	instrumentGroup.GET("/tokens", instrumentHandler.GetInstrumentToTokenMap)
 	instrumentGroup.GET("/symbols", instrumentHandler.GetTokensToInstrumentMap)
 
+	// Optionchain routes (protected)
+	optionchainGroup := api.Group("/instrument/oc")
+	optionchainGroup.Use(middleware.AuthMiddleware(db))
+	optionchainGroup.GET("", instrumentHandler.GetOptionChainInstruments)
+	optionchainGroup.GET("/names", instrumentHandler.GetOptionChainNames)
+
 	// Index routes (protected)
 	indexGroup := api.Group("/index")
 	indexGroup.Use(middleware.AuthMiddleware(db))
 	indexGroup.GET("/names", instrumentHandler.GetIndexNames)
 	indexGroup.GET("/instruments", instrumentHandler.GetIndexInstruments)
-
-	// Optionchain routes (protected)
-	optionchainGroup := api.Group("/optionchain")
-	optionchainGroup.Use(middleware.AuthMiddleware(db))
-	optionchainGroup.GET("/names", instrumentHandler.GetOptionChainNames)
-	optionchainGroup.GET("/instruments", instrumentHandler.GetOptionChainInstruments)
 
 	// Ticker routes (protected)
 	tickerService := service.NewTickerService(db, redisClient)
