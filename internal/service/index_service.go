@@ -15,6 +15,8 @@ import (
 	"gorm.io/gorm"
 )
 
+// var NSEIndicesBaseURL = "https://nsearchives.nseindia.com/content/indices/"
+
 var NSEIndicesBaseURL = "https://niftyindices.com/IndexConstituent/"
 
 var NSEIndicesFileMap = map[string]string{
@@ -84,6 +86,14 @@ func (s *IndexService) UpdateNSEIndices() (int64, error) {
 	s.logger.Info("Indices update required", map[string]interface{}{
 		"lastUpdatedAt": lastUpdatedAt,
 	})
+
+	// fetch nse india home page
+	if err := s.fetchNseIndiaHomePage(); err != nil {
+		s.logger.Error("Failed to fetch nseindia.com home page", map[string]interface{}{
+			"error": err,
+		})
+		return 0, fmt.Errorf("failed to fetch nseindia.com home page: %v", err)
+	}
 
 	// truncate table
 	if err := s.repo.TruncateIndices(); err != nil {
@@ -188,8 +198,43 @@ func (s *IndexService) isUpdateIndicesRequired(lastUpdatedAt string) bool {
 	return true
 }
 
+func (s *IndexService) fetchNseIndiaHomePage() error {
+	// -------------------------------------------------------------------------------------------------
+	// make request to https://nseindia.com/
+	// -------------------------------------------------------------------------------------------------
+	baseUrl := "https://nseindia.com"
+	req, err := http.NewRequest("GET", baseUrl, nil)
+	if err != nil {
+		s.logger.Error("Failed to create request for nseindia.com", map[string]interface{}{
+			"url":   baseUrl,
+			"error": err,
+		})
+		return fmt.Errorf("failed to create request for nseindia.com %s: %v", baseUrl, err)
+	}
+
+	// set headers
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
+	req.Header.Set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8")
+	req.Header.Set("Accept-Language", "en-US,en;q=0.5")
+
+	_, err = s.client.Do(req)
+	if err != nil {
+		s.logger.Error("Failed to make request to nseindia.com", map[string]interface{}{
+			"url":   baseUrl,
+			"error": err,
+		})
+		return fmt.Errorf("failed to make request to nseindia.com %s: %v", baseUrl, err)
+	}
+
+	return nil
+}
+
 // FetchNSEIndexInstruments fetches the instruments for a given NSE index
 func (s *IndexService) FetchNSEIndexInstruments(indexName string) ([]models.IndexModel, error) {
+
+	// -------------------------------------------------------------------------------------------------
+	// make request to index url
+	// -------------------------------------------------------------------------------------------------
 	// get index csv file name
 	indexCsvFile, ok := NSEIndicesFileMap[indexName]
 	if !ok {
@@ -199,9 +244,7 @@ func (s *IndexService) FetchNSEIndexInstruments(indexName string) ([]models.Inde
 	// make url
 	url := fmt.Sprintf("%s%s", NSEIndicesBaseURL, indexCsvFile)
 
-	// -------------------------------------------------------------------------------------------------
-	// make request to index url
-	// -------------------------------------------------------------------------------------------------
+	// create request
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		s.logger.Error("Failed to create request for index", map[string]interface{}{
@@ -211,11 +254,13 @@ func (s *IndexService) FetchNSEIndexInstruments(indexName string) ([]models.Inde
 		return nil, fmt.Errorf("failed to create request for index %s: %v", indexName, err)
 	}
 
+	// set headers
 	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
 	req.Header.Set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8")
 	req.Header.Set("Accept-Language", "en-US,en;q=0.5")
 	req.Header.Set("Referer", "https://niftyindices.com/")
 
+	// make request
 	resp, err := s.client.Do(req)
 	if err != nil {
 		s.logger.Error("Failed to download CSV for index", map[string]interface{}{
