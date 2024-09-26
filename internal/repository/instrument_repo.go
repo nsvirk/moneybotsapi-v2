@@ -60,7 +60,7 @@ func (r *InstrumentRepository) InsertInstruments(records [][]string) (int, error
 		)
 	}
 
-	stmt := fmt.Sprintf("INSERT INTO %s (instrument_token, exchange_token, tradingsymbol, name, last_price, expiry, strike, tick_size, lot_size, instrument_type, segment, exchange, created_at) VALUES %s",
+	stmt := fmt.Sprintf("INSERT INTO %s (instrument_token, exchange_token, tradingsymbol, name, last_price, expiry, strike, tick_size, lot_size, instrument_type, segment, exchange, updated_at) VALUES %s",
 		models.InstrumentsTableName,
 		strings.Join(valueStrings, ","),
 	)
@@ -84,28 +84,40 @@ func (r *InstrumentRepository) GetInstrumentsRecordCount() (int64, error) {
 }
 
 // QueryInstruments queries the instruments table
-func (r *InstrumentRepository) QueryInstruments(exchange, tradingsymbol, expiry, strike, segment string) ([]models.InstrumentModel, error) {
+func (r *InstrumentRepository) QueryInstruments(qip models.QueryInstrumentsParams) ([]models.InstrumentModel, error) {
+
 	query := r.DB.Model(&models.InstrumentModel{})
 
-	if exchange != "" {
-		query = query.Where("exchange LIKE ?", exchange)
+	if qip.Exchange != "" {
+		query = query.Where("exchange = ?", qip.Exchange)
 	}
-	if tradingsymbol != "" {
-		query = query.Where("tradingsymbol LIKE ?", tradingsymbol)
+
+	if qip.Tradingsymbol != "" {
+		query = query.Where("tradingsymbol = ?", qip.Tradingsymbol)
 	}
-	if expiry != "" {
-		query = query.Where("expiry LIKE ?", expiry)
+
+	if qip.Name != "" {
+		query = query.Where("name = ?", qip.Name)
 	}
-	if strike != "" {
-		strikeFloat, err := strconv.ParseFloat(strike, 64)
+
+	if qip.Expiry != "" {
+		query = query.Where("expiry = ?", qip.Expiry)
+	}
+
+	if qip.Strike != "" {
+		strikeFloat, err := strconv.ParseFloat(qip.Strike, 64)
 		if err != nil {
 			return nil, err
 		}
 		query = query.Where("strike = ?", strikeFloat)
 	}
 
-	if segment != "" {
-		query = query.Where("segment LIKE ?", segment)
+	if qip.Segment != "" {
+		query = query.Where("segment = ?", qip.Segment)
+	}
+
+	if qip.InstrumentType != "" {
+		query = query.Where("instrument_type = ?", qip.InstrumentType)
 	}
 
 	var instruments []models.InstrumentModel
@@ -114,6 +126,27 @@ func (r *InstrumentRepository) QueryInstruments(exchange, tradingsymbol, expiry,
 	}
 
 	return instruments, nil
+}
+
+// QueryInstrumentsByExpiry queries the instruments table by expiry and exchange
+func (r *InstrumentRepository) QueryInstrumentsByExpiry(expiry, exchange string) ([]models.InstrumentModel, error) {
+	var instruments []models.InstrumentModel
+
+	query := r.DB.Model(&models.InstrumentModel{})
+
+	if expiry != "" {
+		query = query.Where("expiry = ?", expiry)
+	}
+
+	if exchange != "" {
+		query = query.Where("exchange = ?", exchange)
+	}
+
+	err := query.
+		Select("DISTINCT exchange, name").
+		Find(&instruments).
+		Error
+	return instruments, err
 }
 
 // GetInstrumentsByTokens gets instruments by tokens

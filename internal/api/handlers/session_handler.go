@@ -48,6 +48,7 @@ func (h *SessionHandler) GenerateSession(c echo.Context) error {
 
 // GenerateTOTP generates a TOTP value for the given secret
 func (h *SessionHandler) GenerateTOTP(c echo.Context) error {
+
 	// get the totp_secret from the request
 	totpSecret := c.FormValue("totp_secret")
 

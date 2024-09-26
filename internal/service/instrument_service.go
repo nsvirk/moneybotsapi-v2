@@ -184,6 +184,7 @@ func (s *InstrumentService) isUpdateInstrumentsRequired(lastUpdatedAt string) bo
 
 // GetTokensToInstrumentMap returns a map of token to instrument
 func (s *InstrumentService) GetTokensToInstrumentMap(tokens []uint32) (map[string]string, error) {
+
 	instruments, err := s.repo.GetInstrumentsByTokens(tokens)
 	if err != nil {
 		return nil, err
@@ -200,6 +201,7 @@ func (s *InstrumentService) GetTokensToInstrumentMap(tokens []uint32) (map[strin
 
 // GetInstrumentToTokenMap returns a map of instrument to token
 func (s *InstrumentService) GetInstrumentToTokenMap(instruments []string) (map[string]uint32, error) {
+
 	instrumentToTokenMap := make(map[string]uint32)
 	for _, symbol := range instruments {
 		parts := strings.Split(strings.TrimSpace(symbol), ":")
@@ -225,8 +227,39 @@ func (s *InstrumentService) GetInstrumentToTokenMap(instruments []string) (map[s
 }
 
 // QueryInstruments queries the instruments table
-func (s *InstrumentService) QueryInstruments(exchange, tradingsymbol, expiry, strike, segment string) ([]models.InstrumentModel, error) {
-	return s.repo.QueryInstruments(exchange, tradingsymbol, expiry, strike, segment)
+func (s *InstrumentService) QueryInstruments(queryInstrumentsParams models.QueryInstrumentsParams, details string) ([]interface{}, error) {
+
+	instruments, err := s.repo.QueryInstruments(queryInstrumentsParams)
+	if err != nil {
+		return nil, err
+	}
+
+	// make result as per details value
+	result := make([]interface{}, len(instruments))
+	if details == "t" {
+		for i, instrument := range instruments {
+			result[i] = fmt.Sprintf("%d", instrument.InstrumentToken)
+		}
+	} else if details == "i" {
+		for i, instrument := range instruments {
+			result[i] = fmt.Sprintf("%s:%s", instrument.Exchange, instrument.Tradingsymbol)
+		}
+	} else if details == "it" {
+		for i, instrument := range instruments {
+			result[i] = fmt.Sprintf("%s:%s:%d", instrument.Exchange, instrument.Tradingsymbol, instrument.InstrumentToken)
+		}
+	} else {
+		for i, instrument := range instruments {
+			result[i] = instrument
+		}
+	}
+
+	return result, nil
+}
+
+// QueryInstrumentsByExpiry queries the instruments table by expiry and exchange
+func (s *InstrumentService) QueryInstrumentsByExpiry(expiry, exchange string) ([]models.InstrumentModel, error) {
+	return s.repo.QueryInstrumentsByExpiry(expiry, exchange)
 }
 
 // GetOptionChainNames returns a list of exchange:name for a given expiry
@@ -235,18 +268,7 @@ func (s *InstrumentService) GetOptionChainNames(expiry string) ([]string, error)
 }
 
 // GetOptionChainInstruments returns a list of instruments for a given exchange, name and expiry
-func (s *InstrumentService) GetOptionChainInstruments(exchange, name, expiry, returnType string) ([]interface{}, error) {
-	// get the return type
-	var returnTokens, returnInstruments, returnInstrumentsWithTokens, returnAll bool
-	if returnType == "tokens" {
-		returnTokens = true
-	} else if returnType == "instruments" {
-		returnInstruments = true
-	} else if returnType == "instruments_with_tokens" {
-		returnInstrumentsWithTokens = true
-	} else {
-		returnAll = true
-	}
+func (s *InstrumentService) GetOptionChainInstruments(exchange, name, expiry, details string) ([]interface{}, error) {
 
 	instruments, err := s.repo.GetOptionChainInstruments(exchange, name, expiry)
 	if err != nil {
@@ -254,25 +276,23 @@ func (s *InstrumentService) GetOptionChainInstruments(exchange, name, expiry, re
 	}
 
 	result := make([]interface{}, len(instruments))
-	for i, instrument := range instruments {
-		if returnTokens {
+	if details == "t" {
+		for i, instrument := range instruments {
 			result[i] = fmt.Sprintf("%d", instrument.InstrumentToken)
-			continue
-
-		} else if returnInstruments {
+		}
+	} else if details == "i" {
+		for i, instrument := range instruments {
 			result[i] = fmt.Sprintf("%s:%s", instrument.Exchange, instrument.Tradingsymbol)
-			continue
-
-		} else if returnInstrumentsWithTokens {
+		}
+	} else if details == "it" {
+		for i, instrument := range instruments {
 			result[i] = fmt.Sprintf("%s:%s:%d", instrument.Exchange, instrument.Tradingsymbol, instrument.InstrumentToken)
-			continue
-
-		} else if returnAll {
+		}
+	} else {
+		for i, instrument := range instruments {
 			result[i] = instrument
-			continue
 		}
 	}
 
 	return result, nil
-
 }

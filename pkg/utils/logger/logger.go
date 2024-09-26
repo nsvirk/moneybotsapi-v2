@@ -87,6 +87,7 @@ func (l *Logger) log(level LogLevel, message string, fields map[string]interface
 
 // Debug logs a debug message
 func (l *Logger) Debug(message string, fields map[string]interface{}) {
+	zaplogger.Debug(message, fields)
 	err := l.log(DEBUG, message, fields)
 	if err != nil {
 		zaplogger.Error("Failed to log DEBUG message", map[string]interface{}{
@@ -97,6 +98,7 @@ func (l *Logger) Debug(message string, fields map[string]interface{}) {
 
 // Info logs an info message
 func (l *Logger) Info(message string, fields map[string]interface{}) {
+	zaplogger.Info(message, fields)
 	err := l.log(INFO, message, fields)
 	if err != nil {
 		zaplogger.Error("Failed to log INFO message", map[string]interface{}{
@@ -107,6 +109,7 @@ func (l *Logger) Info(message string, fields map[string]interface{}) {
 
 // Warn logs a warning message
 func (l *Logger) Warn(message string, fields map[string]interface{}) {
+	zaplogger.Warn(message, fields)
 	err := l.log(WARN, message, fields)
 	if err != nil {
 		zaplogger.Error("Failed to log WARN message", map[string]interface{}{
@@ -117,6 +120,7 @@ func (l *Logger) Warn(message string, fields map[string]interface{}) {
 
 // Error logs an error message
 func (l *Logger) Error(message string, fields map[string]interface{}) {
+	zaplogger.Error(message, fields)
 	err := l.log(ERROR, message, fields)
 	if err != nil {
 		zaplogger.Error("Failed to log ERROR message", map[string]interface{}{
@@ -127,6 +131,7 @@ func (l *Logger) Error(message string, fields map[string]interface{}) {
 
 // Fatal logs a fatal message
 func (l *Logger) Fatal(message string, fields map[string]interface{}) {
+	zaplogger.Fatal(message, fields)
 	err := l.log(FATAL, message, fields)
 	if err != nil {
 		zaplogger.Error("Failed to log FATAL message", map[string]interface{}{

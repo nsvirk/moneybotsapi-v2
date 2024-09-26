@@ -316,6 +316,16 @@ func (s *IndexService) GetNSEIndexNames() ([]string, error) {
 }
 
 // GetNSEIndexInstruments fetches the instruments for a given NSE index
-func (s *IndexService) GetNSEIndexInstruments(indexName string) ([]models.IndexModel, error) {
-	return s.repo.GetNSEIndexInstruments(indexName)
+func (s *IndexService) GetNSEIndexInstruments(indexName string) ([]string, error) {
+	instruments, err := s.repo.GetNSEIndexInstruments(indexName)
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([]string, len(instruments))
+	for i, instrument := range instruments {
+		result[i] = instrument.Instrument
+	}
+
+	return result, nil
 }
