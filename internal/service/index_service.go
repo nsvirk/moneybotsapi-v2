@@ -16,8 +16,8 @@ import (
 )
 
 // var NSEIndicesBaseURL = "https://nsearchives.nseindia.com/content/indices/"
-
-var NSEIndicesBaseURL = "https://niftyindices.com/IndexConstituent/"
+// var NSEIndicesBaseURL = "https://niftyindices.com/IndexConstituent/"
+var NSEIndicesBaseURL = "https://raw.githubusercontent.com/nsvirk/nseindicesdata/refs/heads/main/csvfiles/"
 
 var NSEIndicesFileMap = map[string]string{
 	"NSE:NIFTY 50":                 "ind_nifty50list.csv",
