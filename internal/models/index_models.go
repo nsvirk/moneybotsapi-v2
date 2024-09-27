@@ -10,14 +10,15 @@ var IndexTableName = "indices"
 
 // Index represents a trading index
 type IndexModel struct {
-	ID          uint32    `gorm:"primaryKey;autoIncrement" json:"-"`
-	Index       string    `json:"index" gorm:"uniqueIndex:idx_index_instrument"`
-	Instrument  string    `json:"instrument" gorm:"uniqueIndex:idx_index_instrument"`
-	CompanyName string    `json:"company_name"`
-	Industry    string    `json:"industry" gorm:"index"`
-	Series      string    `json:"series"`
-	ISINCode    string    `json:"isin_code"`
-	CreatedAt   time.Time `gorm:"autoCreateTime" json:"-"`
+	ID            uint32    `gorm:"primaryKey;autoIncrement" json:"-"`
+	Index         string    `json:"index,omitempty" gorm:"index"`
+	Exchange      string    `json:"exchange,omitempty"`
+	Tradingsymbol string    `json:"tradingsymbol,omitempty" gorm:"index"`
+	CompanyName   string    `json:"company_name,omitempty"`
+	Industry      string    `json:"industry,omitempty" gorm:"index"`
+	Series        string    `json:"series,omitempty"`
+	ISINCode      string    `json:"isin_code,omitempty"`
+	UpdatedAt     time.Time `gorm:"autoUpdateTime" json:"-"`
 }
 
 // TableName specifies the table name for the Index model

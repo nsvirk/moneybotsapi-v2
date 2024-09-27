@@ -18,8 +18,8 @@ func NewIndexRepository(db *gorm.DB) *IndexRepository {
 	return &IndexRepository{DB: db}
 }
 
-// TruncateIndices truncates the indices table
-func (r *IndexRepository) TruncateIndices() error {
+// TruncateIndicesTable truncates the indices table
+func (r *IndexRepository) TruncateIndicesTable() error {
 	return r.DB.Exec(fmt.Sprintf("TRUNCATE TABLE %s RESTART IDENTITY CASCADE", models.IndexTableName)).Error
 }
 
@@ -43,6 +43,16 @@ func (r *IndexRepository) GetIndicesRecordCount() (int64, error) {
 	return count, nil
 }
 
+// GetNSEIndexNames fetches the names of all NSE indices
+func (r *IndexRepository) GetNSEIndexNames() ([]string, error) {
+	var indices []string
+	err := r.DB.Table(models.IndexTableName).Select("DISTINCT index").Find(&indices).Error
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch nse index names: %v", err)
+	}
+	return indices, nil
+}
+
 // GetNSEIndexInstruments fetches the instruments for a given NSE index
 func (r *IndexRepository) GetNSEIndexInstruments(indexName string) ([]models.IndexModel, error) {
 	var indexInstruments []models.IndexModel
@@ -52,14 +62,4 @@ func (r *IndexRepository) GetNSEIndexInstruments(indexName string) ([]models.Ind
 	}
 
 	return indexInstruments, nil
-}
-
-// GetNSEIndexNames fetches the names of all NSE indices
-func (r *IndexRepository) GetNSEIndexNames() ([]string, error) {
-	var indices []string
-	err := r.DB.Table(models.IndexTableName).Select("DISTINCT index").Find(&indices).Error
-	if err != nil {
-		return nil, fmt.Errorf("failed to fetch nse index names: %v", err)
-	}
-	return indices, nil
 }

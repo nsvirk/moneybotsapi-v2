@@ -20,7 +20,7 @@ type InstrumentModel struct {
 	InstrumentType  string    `csv:"instrument_type" json:"instrument_type"`
 	Segment         string    `csv:"segment" json:"segment"`
 	Exchange        string    `gorm:"index:idx_exchange_tradingsymbol,priority:1;index:idx_exch_trading_expiry,priority:1;index:idx_exch_trading_expiry_strike,priority:1" csv:"exchange" json:"exchange"`
-	UpdatedAt       time.Time `gorm:"autoUpdateTime" json:"updated_at"`
+	UpdatedAt       time.Time `gorm:"autoUpdateTime" json:"-"`
 }
 
 // TableName specifies the table name for the Instrument model

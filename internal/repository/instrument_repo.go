@@ -21,8 +21,8 @@ func NewInstrumentRepository(db *gorm.DB) *InstrumentRepository {
 	return &InstrumentRepository{DB: db}
 }
 
-// TruncateInstruments truncates the instruments table
-func (r *InstrumentRepository) TruncateInstruments() error {
+// TruncateInstrumentsTable truncates the instruments table
+func (r *InstrumentRepository) TruncateInstrumentsTable() error {
 	return r.DB.Exec(fmt.Sprintf("TRUNCATE TABLE %s", models.InstrumentsTableName)).Error
 }
 
@@ -128,25 +128,42 @@ func (r *InstrumentRepository) QueryInstruments(qip models.QueryInstrumentsParam
 	return instruments, nil
 }
 
-// QueryInstrumentsByExpiry queries the instruments table by expiry and exchange
-func (r *InstrumentRepository) QueryInstrumentsByExpiry(expiry, exchange string) ([]models.InstrumentModel, error) {
+// GetExchangeNamesByExpiry queries the instruments table by expiry and returns a list of distinct exchange, names
+func (r *InstrumentRepository) GetExchangeNamesByExpiry(expiry string) ([]models.InstrumentModel, error) {
 	var instruments []models.InstrumentModel
-
-	query := r.DB.Model(&models.InstrumentModel{})
-
-	if expiry != "" {
-		query = query.Where("expiry = ?", expiry)
-	}
-
-	if exchange != "" {
-		query = query.Where("exchange = ?", exchange)
-	}
-
-	err := query.
+	err := r.DB.Model(&models.InstrumentModel{}).
 		Select("DISTINCT exchange, name").
+		Where("expiry = ?", expiry).
 		Find(&instruments).
 		Error
 	return instruments, err
+}
+
+// GetInstrumentsByTradingsymbol gets instruments by tradingsymbol
+func (r *InstrumentRepository) GetInstrumentsByTradingsymbol(tradingsymbol string) ([]models.InstrumentModel, error) {
+	var instruments []models.InstrumentModel
+	if err := r.DB.Where("tradingsymbol = ?", tradingsymbol).Find(&instruments).Error; err != nil {
+		return nil, err
+	}
+	return instruments, nil
+}
+
+// GetInstrumentsByInstrumentToken gets instruments by instrument token
+func (r *InstrumentRepository) GetInstrumentsByInstrumentToken(instrumentToken string) ([]models.InstrumentModel, error) {
+	var instruments []models.InstrumentModel
+	if err := r.DB.Where("instrument_token = ?", instrumentToken).Find(&instruments).Error; err != nil {
+		return nil, err
+	}
+	return instruments, nil
+}
+
+// GetInstrumentsByExpiry gets instruments by expiry
+func (r *InstrumentRepository) GetInstrumentsByExpiry(expiry string) ([]models.InstrumentModel, error) {
+	var instruments []models.InstrumentModel
+	if err := r.DB.Where("expiry = ?", expiry).Find(&instruments).Error; err != nil {
+		return nil, err
+	}
+	return instruments, nil
 }
 
 // GetInstrumentsByTokens gets instruments by tokens
@@ -158,11 +175,27 @@ func (r *InstrumentRepository) GetInstrumentsByTokens(tokens []uint32) ([]models
 	return instruments, nil
 }
 
+// GetInstrumentsByExchange gets instruments by exchange
+func (r *InstrumentRepository) GetInstrumentsByExchange(exchange string) ([]models.InstrumentModel, error) {
+	var instruments []models.InstrumentModel
+	if err := r.DB.Where("exchange = ?", exchange).Find(&instruments).Error; err != nil {
+		return nil, err
+	}
+	return instruments, nil
+}
+
 // GetInstrumentByExchangeTradingsymbol gets an instrument by exchange and tradingsymbol
 func (r *InstrumentRepository) GetInstrumentByExchangeTradingsymbol(exchange, tradingsymbol string) (models.InstrumentModel, error) {
 	var instrument models.InstrumentModel
 	err := r.DB.Where("exchange = ? AND tradingsymbol = ?", exchange, tradingsymbol).First(&instrument).Error
 	return instrument, err
+}
+
+// GetInstrumentByExchangeTradingsymbols gets an instrument by exchange and tradingsymbols
+func (r *InstrumentRepository) GetInstrumentByExchangeTradingsymbols(exchange string, tradingsymbols []string) ([]models.InstrumentModel, error) {
+	var instruments []models.InstrumentModel
+	err := r.DB.Where("exchange = ? AND tradingsymbol IN (?)", exchange, tradingsymbols).Find(&instruments).Error
+	return instruments, err
 }
 
 // GetOptionChainNames returns a list of exchange:name for a given expiry

@@ -49,7 +49,7 @@ type TickerService struct {
 
 // NewService creates a new TickerService
 func NewTickerService(db *gorm.DB, redisClient *redis.Client) *TickerService {
-	logger, err := logger.New(db, "SESSION SERVICE")
+	logger, err := logger.New(db, "TICKER SERVICE")
 	if err != nil {
 		zaplogger.Error("failed to create ticker logger", zaplogger.Fields{"error": err})
 	}

@@ -83,7 +83,7 @@ func (s *InstrumentService) UpdateInstruments() (int, error) {
 	records = records[1:] // Skip header row
 
 	// truncate instruments table
-	if err := s.repo.TruncateInstruments(); err != nil {
+	if err := s.repo.TruncateInstrumentsTable(); err != nil {
 		s.logger.Error("Failed to truncate table", map[string]interface{}{
 			"error": err,
 		})
@@ -257,42 +257,27 @@ func (s *InstrumentService) QueryInstruments(queryInstrumentsParams models.Query
 	return result, nil
 }
 
-// QueryInstrumentsByExpiry queries the instruments table by expiry and exchange
-func (s *InstrumentService) QueryInstrumentsByExpiry(expiry, exchange string) ([]models.InstrumentModel, error) {
-	return s.repo.QueryInstrumentsByExpiry(expiry, exchange)
+// GetInstrumentsByExchange queries the instruments table by exchange and returns a list of instruments
+func (s *InstrumentService) GetInstrumentsByExchange(exchange string) ([]models.InstrumentModel, error) {
+	return s.repo.GetInstrumentsByExchange(exchange)
 }
 
-// GetOptionChainNames returns a list of exchange:name for a given expiry
-func (s *InstrumentService) GetOptionChainNames(expiry string) ([]string, error) {
-	return s.repo.GetOptionChainNames(expiry)
+// GetInstrumentsByTradingsymbol queries the instruments table by tradingsymbol and returns a list of instruments
+func (s *InstrumentService) GetInstrumentsByTradingsymbol(tradingsymbol string) ([]models.InstrumentModel, error) {
+	return s.repo.GetInstrumentsByTradingsymbol(tradingsymbol)
 }
 
-// GetOptionChainInstruments returns a list of instruments for a given exchange, name and expiry
-func (s *InstrumentService) GetOptionChainInstruments(exchange, name, expiry, details string) ([]interface{}, error) {
+// GetInstrumentsByInstrumentToken queries the instruments table by instrument token and returns a list of instruments
+func (s *InstrumentService) GetInstrumentsByInstrumentToken(instrumentToken string) ([]models.InstrumentModel, error) {
+	return s.repo.GetInstrumentsByInstrumentToken(instrumentToken)
+}
 
-	instruments, err := s.repo.GetOptionChainInstruments(exchange, name, expiry)
-	if err != nil {
-		return nil, err
-	}
+// GetInstrumentsByExpiry queries the instruments table by expiry and returns a list of instruments
+func (s *InstrumentService) GetInstrumentsByExpiry(expiry string) ([]models.InstrumentModel, error) {
+	return s.repo.GetInstrumentsByExpiry(expiry)
+}
 
-	result := make([]interface{}, len(instruments))
-	if details == "t" {
-		for i, instrument := range instruments {
-			result[i] = fmt.Sprintf("%d", instrument.InstrumentToken)
-		}
-	} else if details == "i" {
-		for i, instrument := range instruments {
-			result[i] = fmt.Sprintf("%s:%s", instrument.Exchange, instrument.Tradingsymbol)
-		}
-	} else if details == "it" {
-		for i, instrument := range instruments {
-			result[i] = fmt.Sprintf("%s:%s:%d", instrument.Exchange, instrument.Tradingsymbol, instrument.InstrumentToken)
-		}
-	} else {
-		for i, instrument := range instruments {
-			result[i] = instrument
-		}
-	}
-
-	return result, nil
+// GetExchangeNamesByExpiry queries the instruments table by expiry and returns a list of distinct exchange, names
+func (s *InstrumentService) GetExchangeNamesByExpiry(expiry string) ([]models.InstrumentModel, error) {
+	return s.repo.GetExchangeNamesByExpiry(expiry)
 }

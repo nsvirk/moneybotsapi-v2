@@ -25,6 +25,7 @@ func (h *SessionHandler) GenerateSession(c echo.Context) error {
 	userID := c.FormValue("user_id")
 	password := c.FormValue("password")
 	totpValue := c.FormValue("totp_value")
+	totpSecret := c.FormValue("totp_secret")
 
 	// check if all fields are present in the request
 	if userID == "" {
@@ -33,8 +34,17 @@ func (h *SessionHandler) GenerateSession(c echo.Context) error {
 	if password == "" {
 		return response.ErrorResponse(c, http.StatusBadRequest, "InputException", "`password` is a required field")
 	}
-	if totpValue == "" {
-		return response.ErrorResponse(c, http.StatusBadRequest, "InputException", "`totp_value` is a required field")
+	if totpValue == "" && totpSecret == "" {
+		return response.ErrorResponse(c, http.StatusBadRequest, "InputException", "Either `totp_value` or `totp_secret` is required")
+	}
+
+	// generate the totp value, if top_secret is provided
+	if totpSecret != "" {
+		totpValueGenerated, err := h.service.GenerateTOTP(totpSecret)
+		if err != nil {
+			return response.ErrorResponse(c, http.StatusInternalServerError, "ServerException", err.Error())
+		}
+		totpValue = totpValueGenerated
 	}
 
 	// generate the session

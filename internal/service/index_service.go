@@ -44,10 +44,11 @@ var NSEIndicesFileMap = map[string]string{
 
 // IndexService is the service for managing indices
 type IndexService struct {
-	client *http.Client
-	repo   *repository.IndexRepository
-	state  *state.State
-	logger *logger.Logger
+	client         *http.Client
+	repo           *repository.IndexRepository
+	instrumentRepo *repository.InstrumentRepository
+	state          *state.State
+	logger         *logger.Logger
 }
 
 // NewIndexService creates a new IndexService
@@ -61,10 +62,11 @@ func NewIndexService(db *gorm.DB) *IndexService {
 		zaplogger.Error("failed to create cron logger", zaplogger.Fields{"error": err})
 	}
 	return &IndexService{
-		client: &http.Client{},
-		repo:   repository.NewIndexRepository(db),
-		state:  stateManager,
-		logger: logger,
+		client:         &http.Client{},
+		repo:           repository.NewIndexRepository(db),
+		instrumentRepo: repository.NewInstrumentRepository(db),
+		state:          stateManager,
+		logger:         logger,
 	}
 }
 
@@ -82,21 +84,14 @@ func (s *IndexService) UpdateNSEIndices() (int64, error) {
 			return 0, nil
 		}
 	}
+
 	// update log with logger
 	s.logger.Info("Indices update required", map[string]interface{}{
 		"lastUpdatedAt": lastUpdatedAt,
 	})
 
-	// fetch nse india home page
-	if err := s.fetchNseIndiaHomePage(); err != nil {
-		s.logger.Error("Failed to fetch nseindia.com home page", map[string]interface{}{
-			"error": err,
-		})
-		return 0, fmt.Errorf("failed to fetch nseindia.com home page: %v", err)
-	}
-
 	// truncate table
-	if err := s.repo.TruncateIndices(); err != nil {
+	if err := s.repo.TruncateIndicesTable(); err != nil {
 		s.logger.Error("Failed to truncate table", map[string]interface{}{
 			"error": err,
 		})
@@ -115,8 +110,8 @@ func (s *IndexService) UpdateNSEIndices() (int64, error) {
 
 	// update indices
 	for _, index := range indices {
-		// get instruments for index
-		indexInstruments, err := s.FetchNSEIndexInstruments(index)
+		// get records for index
+		indexRecords, err := s.FetchNSEIndexInstruments(index)
 		if err != nil {
 			s.logger.Error("Failed to get instruments for index", map[string]interface{}{
 				"indexindex": index,
@@ -125,19 +120,7 @@ func (s *IndexService) UpdateNSEIndices() (int64, error) {
 			return 0, fmt.Errorf("failed to get instruments for index %s: %v", index, err)
 		}
 
-		// prepare indexInstruments for InsertIndices
-		for i, idxInstrument := range indexInstruments {
-			indexInstruments[i] = models.IndexModel{
-				Index:       index,
-				Instrument:  idxInstrument.Instrument,
-				CompanyName: idxInstrument.CompanyName,
-				Industry:    idxInstrument.Industry,
-				Series:      idxInstrument.Series,
-				ISINCode:    idxInstrument.ISINCode,
-				CreatedAt:   time.Now(),
-			}
-		}
-		count, err := s.repo.InsertIndices(indexInstruments)
+		count, err := s.repo.InsertIndices(indexRecords)
 		if err != nil {
 			s.logger.Error("Failed to insert instruments for index", map[string]interface{}{
 				"index": index,
@@ -198,37 +181,6 @@ func (s *IndexService) isUpdateIndicesRequired(lastUpdatedAt string) bool {
 	return true
 }
 
-func (s *IndexService) fetchNseIndiaHomePage() error {
-	// -------------------------------------------------------------------------------------------------
-	// make request to https://nseindia.com/
-	// -------------------------------------------------------------------------------------------------
-	baseUrl := "https://nseindia.com"
-	req, err := http.NewRequest("GET", baseUrl, nil)
-	if err != nil {
-		s.logger.Error("Failed to create request for nseindia.com", map[string]interface{}{
-			"url":   baseUrl,
-			"error": err,
-		})
-		return fmt.Errorf("failed to create request for nseindia.com %s: %v", baseUrl, err)
-	}
-
-	// set headers
-	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
-	req.Header.Set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8")
-	req.Header.Set("Accept-Language", "en-US,en;q=0.5")
-
-	_, err = s.client.Do(req)
-	if err != nil {
-		s.logger.Error("Failed to make request to nseindia.com", map[string]interface{}{
-			"url":   baseUrl,
-			"error": err,
-		})
-		return fmt.Errorf("failed to make request to nseindia.com %s: %v", baseUrl, err)
-	}
-
-	return nil
-}
-
 // FetchNSEIndexInstruments fetches the instruments for a given NSE index
 func (s *IndexService) FetchNSEIndexInstruments(indexName string) ([]models.IndexModel, error) {
 
@@ -281,24 +233,24 @@ func (s *IndexService) FetchNSEIndexInstruments(indexName string) ([]models.Inde
 		return nil, fmt.Errorf("failed to parse CSV for index %s: %v", indexName, err)
 	}
 
-	indexInstruments := make([]models.IndexModel, 0, len(records)-1)
+	indexRecords := make([]models.IndexModel, 0, len(records)-1)
 	for _, record := range records[1:] { // Skip header row
-		// record is [Company Name, Industry, Symbol, Series, ISIN Code]
-		//  sample is 360 ONE WAM Ltd, Financial Services, 360ONE, EQ, INE466L01038
+		// record : [Company Name, Industry, Symbol, Series, ISIN Code]
 		if len(record) < 5 {
 			continue
 		}
-		indexInstruments = append(indexInstruments, models.IndexModel{
-			Index:       indexName,
-			Instrument:  "NSE:" + record[2],
-			CompanyName: record[0],
-			Industry:    record[1],
-			Series:      record[3],
-			ISINCode:    record[4],
+		indexRecords = append(indexRecords, models.IndexModel{
+			Index:         indexName,
+			Exchange:      "NSE",
+			CompanyName:   record[0],
+			Industry:      record[1],
+			Tradingsymbol: record[2],
+			Series:        record[3],
+			ISINCode:      record[4],
 		})
 	}
 
-	return indexInstruments, nil
+	return indexRecords, nil
 }
 
 // GetNSEIndexNamesFromFileMap fetches the names of all NSE indices from NSEIndicesFileMap
@@ -316,15 +268,44 @@ func (s *IndexService) GetNSEIndexNames() ([]string, error) {
 }
 
 // GetNSEIndexInstruments fetches the instruments for a given NSE index
-func (s *IndexService) GetNSEIndexInstruments(indexName string) ([]string, error) {
-	instruments, err := s.repo.GetNSEIndexInstruments(indexName)
+func (s *IndexService) GetNSEIndexInstruments(indexName, details string) ([]interface{}, error) {
+	indexRecords, err := s.repo.GetNSEIndexInstruments(indexName)
 	if err != nil {
 		return nil, err
 	}
 
-	result := make([]string, len(instruments))
-	for i, instrument := range instruments {
-		result[i] = instrument.Instrument
+	// get instruments from index repo
+	var exchange string
+	indexTradingsymbols := make([]string, len(indexRecords))
+	for i, indexRecord := range indexRecords {
+		exchange = indexRecord.Exchange
+		indexTradingsymbols[i] = indexRecord.Tradingsymbol
+	}
+
+	// get instruments from instrument repo
+	instruments, err := s.instrumentRepo.GetInstrumentByExchangeTradingsymbols(exchange, indexTradingsymbols)
+	if err != nil {
+		return nil, err
+	}
+
+	// make result as per details value
+	result := make([]interface{}, len(instruments))
+	if details == "t" {
+		for i, instrument := range instruments {
+			result[i] = fmt.Sprintf("%d", instrument.InstrumentToken)
+		}
+	} else if details == "i" {
+		for i, instrument := range instruments {
+			result[i] = fmt.Sprintf("%s:%s", instrument.Exchange, instrument.Tradingsymbol)
+		}
+	} else if details == "it" {
+		for i, instrument := range instruments {
+			result[i] = fmt.Sprintf("%s:%s:%d", instrument.Exchange, instrument.Tradingsymbol, instrument.InstrumentToken)
+		}
+	} else {
+		for i, instrument := range instruments {
+			result[i] = instrument
+		}
 	}
 
 	return result, nil

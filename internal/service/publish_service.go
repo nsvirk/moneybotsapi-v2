@@ -7,6 +7,7 @@ import (
 
 	"github.com/lib/pq"
 	"github.com/nsvirk/moneybotsapi/pkg/utils/logger"
+	"github.com/nsvirk/moneybotsapi/pkg/utils/zaplogger"
 	"github.com/redis/go-redis/v9"
 	"gorm.io/gorm"
 )
@@ -18,31 +19,36 @@ type PublishService struct {
 	db          *gorm.DB
 	redisClient *redis.Client
 	pgConnStr   string
+	logger      *logger.Logger
 }
 
 func NewPublishService(db *gorm.DB, redisClient *redis.Client, pgConnStr string) *PublishService {
-	return &PublishService{db: db, redisClient: redisClient, pgConnStr: pgConnStr}
+	logger, err := logger.New(db, "PUBLISH SERVICE")
+	if err != nil {
+		zaplogger.Error("failed to create publish logger", zaplogger.Fields{"error": err})
+	}
+	return &PublishService{
+		db:          db,
+		redisClient: redisClient,
+		pgConnStr:   pgConnStr,
+		logger:      logger,
+	}
 }
 
 func (s *PublishService) PublishTicksToRedisChannel() {
-	//  Create a logger
-	ticksLogger, err := logger.New(s.db, "TICKS SERVICE")
-	if err != nil {
-		panic(err)
-	}
 
 	// Create a PostgreSQL listener
 	listener := pq.NewListener(s.pgConnStr, 10*time.Second, time.Minute, nil)
-	err = listener.Listen(PostgresChannel)
+	err := listener.Listen(PostgresChannel)
 	if err != nil {
-		ticksLogger.Error("Failed to create listener", map[string]interface{}{
+		s.logger.Error("Failed to create listener", map[string]interface{}{
 			"Postgres Channel": PostgresChannel,
 			"error":            err,
 		})
 		return
 	}
 
-	ticksLogger.Info("Starting to Publish", map[string]interface{}{
+	s.logger.Info("Starting to Publish", map[string]interface{}{
 		"Postgres Channel": PostgresChannel,
 		"Redis Channel":    RedisChannel,
 	})
@@ -55,7 +61,7 @@ func (s *PublishService) PublishTicksToRedisChannel() {
 			// Publish the notification to Redis
 			err := s.redisClient.Publish(ctx, RedisChannel, n.Extra).Err()
 			if err != nil {
-				ticksLogger.Error("Failed to publish to Redis", map[string]interface{}{
+				s.logger.Error("Failed to publish to Redis", map[string]interface{}{
 					"Postgres Channel": PostgresChannel,
 					"Redis Channel":    RedisChannel,
 					"error":            err,
@@ -65,7 +71,7 @@ func (s *PublishService) PublishTicksToRedisChannel() {
 			go func() {
 				err := listener.Ping()
 				if err != nil {
-					ticksLogger.Error("Error pinging PostgreSQL", map[string]interface{}{
+					s.logger.Error("Error pinging PostgreSQL", map[string]interface{}{
 						"Postgres Channel": PostgresChannel,
 						"Redis Channel":    RedisChannel,
 						"error":            err,
