@@ -58,9 +58,9 @@ func (r *TickerRepository) TruncateTickerInstruments() (int64, error) {
 }
 
 // UpsertTickerInstruments upserts the instruments
-func (r *TickerRepository) UpsertTickerInstruments(userID string, instrumentsTokenMap map[string]uint32) (int, int, error) {
-	var insertedCount int
-	var updatedCount int
+func (r *TickerRepository) UpsertTickerInstruments(userID string, instrumentsTokenMap map[string]uint32) (int64, int64, error) {
+	var insertedCount int64
+	var updatedCount int64
 
 	for instrument, token := range instrumentsTokenMap {
 		result := r.DB.Clauses(clause.OnConflict{

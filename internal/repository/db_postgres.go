@@ -6,7 +6,6 @@ import (
 
 	"github.com/nsvirk/moneybotsapi/internal/config"
 	"github.com/nsvirk/moneybotsapi/internal/models"
-	"github.com/nsvirk/moneybotsapi/pkg/utils/zaplogger"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
@@ -14,10 +13,6 @@ import (
 
 // ConnectPostgres connects to a Postgres database and returns a GORM database object
 func ConnectPostgres(cfg *config.Config) (*gorm.DB, error) {
-	zaplogger.Info(config.SingleLine)
-	zaplogger.Info("Initializing Postgres")
-	zaplogger.Info(config.SingleLine)
-
 	// Set up GORM logger
 	var logLevel logger.LogLevel
 	switch cfg.PostgresLogLevel {
@@ -44,14 +39,11 @@ func ConnectPostgres(cfg *config.Config) (*gorm.DB, error) {
 		return nil, fmt.Errorf("failed to connect to Postgres: %v", err)
 	}
 
-	zaplogger.Info("  * connected")
-
 	// Create the schema if it doesn't exist
 	createSchemaSql := fmt.Sprintf("CREATE SCHEMA IF NOT EXISTS %s", cfg.PostgresSchema)
 	if err := db.Exec(createSchemaSql).Error; err != nil {
 		panic("failed to create schema: " + err.Error())
 	}
-	zaplogger.Info("  * migrating scheme: \"" + cfg.PostgresSchema + "\"")
 
 	// AutoMigrate will create tables and add/modify columns
 	if err := autoMigrate(db, cfg); err != nil {
@@ -63,8 +55,6 @@ func ConnectPostgres(cfg *config.Config) (*gorm.DB, error) {
 	if err != nil {
 		return nil, err
 	}
-	zaplogger.Info("  * table " + models.TickerDataTableName + " set as unlogged")
-
 	return db, nil
 }
 
@@ -81,15 +71,12 @@ func autoMigrate(db *gorm.DB, cfg *config.Config) error {
 		{models.TickerDataTableName, &models.TickerData{}},
 	}
 
-	zaplogger.Info("  * migrating tables")
 	for _, table := range tables {
 		err := db.Table(cfg.PostgresSchema + "." + table.name).AutoMigrate(&table.model)
 		if err != nil {
 			return fmt.Errorf("failed to auto migrate table: %s, err:%v", table.name, err)
 		}
-		zaplogger.Info("    - \"" + cfg.PostgresSchema + "." + table.name + "\"")
 	}
-
 	return nil
 }
 
@@ -99,6 +86,5 @@ func setTickerDataTableAsUnlogged(db *gorm.DB, cfg *config.Config) error {
 	if err := db.Table(cfg.PostgresSchema + "." + table).Exec("ALTER TABLE " + table + " SET UNLOGGED").Error; err != nil {
 		return fmt.Errorf("failed to set table as unlogged: %v", err)
 	}
-
 	return nil
 }

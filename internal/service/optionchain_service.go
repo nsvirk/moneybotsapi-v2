@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/nsvirk/moneybotsapi/internal/repository"
-	"github.com/nsvirk/moneybotsapi/pkg/utils/logger"
 	"github.com/nsvirk/moneybotsapi/pkg/utils/state"
 	"github.com/nsvirk/moneybotsapi/pkg/utils/zaplogger"
 	"gorm.io/gorm"
@@ -13,9 +12,8 @@ import (
 
 // InstrumentService is the service for managing instruments
 type OptionchainService struct {
-	repo   *repository.InstrumentRepository
-	state  *state.State
-	logger *logger.Logger
+	repo  *repository.InstrumentRepository
+	state *state.State
 }
 
 // NewOptionchainService creates a new optionchain service
@@ -24,15 +22,9 @@ func NewOptionchainService(db *gorm.DB) *OptionchainService {
 	if err != nil {
 		zaplogger.Fatal("failed to create state manager", zaplogger.Fields{"error": err})
 	}
-	logger, err := logger.New(db, "OPTIONCHAIN SERVICE")
-	if err != nil {
-		zaplogger.Error("failed to create optionchain logger", zaplogger.Fields{"error": err})
-	}
-
 	return &OptionchainService{
-		repo:   repository.NewInstrumentRepository(db),
-		state:  stateManager,
-		logger: logger,
+		repo:  repository.NewInstrumentRepository(db),
+		state: stateManager,
 	}
 }
 

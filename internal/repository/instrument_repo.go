@@ -27,7 +27,7 @@ func (r *InstrumentRepository) TruncateInstrumentsTable() error {
 }
 
 // InsertInstruments inserts a batch of instruments into the database
-func (r *InstrumentRepository) InsertInstruments(records [][]string) (int, error) {
+func (r *InstrumentRepository) InsertInstruments(records [][]string) (int64, error) {
 	valueStrings := make([]string, 0, len(records))
 	valueArgs := make([]interface{}, 0, len(records)*13)
 
@@ -70,7 +70,7 @@ func (r *InstrumentRepository) InsertInstruments(records [][]string) (int, error
 		return 0, fmt.Errorf("failed to insert batch into %s: %v", models.InstrumentsTableName, result.Error)
 	}
 
-	return int(result.RowsAffected), nil
+	return result.RowsAffected, nil
 }
 
 // GetInstrumentsRecordCount returns the number of records in the instruments table

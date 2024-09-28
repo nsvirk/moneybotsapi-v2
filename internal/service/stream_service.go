@@ -13,8 +13,6 @@ import (
 
 	"github.com/labstack/echo/v4"
 	kiteticker "github.com/nsvirk/gokiteticker"
-	"github.com/nsvirk/moneybotsapi/pkg/utils/logger"
-	"github.com/nsvirk/moneybotsapi/pkg/utils/zaplogger"
 
 	"gorm.io/gorm"
 )
@@ -44,23 +42,16 @@ type StreamService struct {
 	isConnected       bool
 	connectChan       chan struct{}
 	subscriptionChan  chan StreamSubscriptionRequest
-	logger            *logger.Logger
 }
 
 // NewStreamService creates a new service for the stream API
 func NewStreamService(db *gorm.DB) *StreamService {
-	logger, err := logger.New(db, "STREAM SERVICE")
-	if err != nil {
-		zaplogger.Error("failed to create stream logger", zaplogger.Fields{"error": err})
-	}
-
 	s := &StreamService{
 		instrumentService: NewInstrumentService(db),
 		globalTokenMap:    make(map[uint32]string),
 		clients:           make(map[string]*StreamClient),
 		connectChan:       make(chan struct{}),
 		subscriptionChan:  make(chan StreamSubscriptionRequest),
-		logger:            logger,
 	}
 	go s.subscriptionHandler()
 	return s

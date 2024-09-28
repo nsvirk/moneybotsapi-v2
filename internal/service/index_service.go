@@ -9,7 +9,6 @@ import (
 
 	"github.com/nsvirk/moneybotsapi/internal/models"
 	"github.com/nsvirk/moneybotsapi/internal/repository"
-	"github.com/nsvirk/moneybotsapi/pkg/utils/logger"
 	"github.com/nsvirk/moneybotsapi/pkg/utils/state"
 	"github.com/nsvirk/moneybotsapi/pkg/utils/zaplogger"
 	"gorm.io/gorm"
@@ -48,7 +47,6 @@ type IndexService struct {
 	repo           *repository.IndexRepository
 	instrumentRepo *repository.InstrumentRepository
 	state          *state.State
-	logger         *logger.Logger
 }
 
 // NewIndexService creates a new IndexService
@@ -57,16 +55,12 @@ func NewIndexService(db *gorm.DB) *IndexService {
 	if err != nil {
 		zaplogger.Fatal("failed to create state manager", zaplogger.Fields{"error": err})
 	}
-	logger, err := logger.New(db, "INDEX SERVICE")
-	if err != nil {
-		zaplogger.Error("failed to create cron logger", zaplogger.Fields{"error": err})
-	}
+
 	return &IndexService{
 		client:         &http.Client{},
 		repo:           repository.NewIndexRepository(db),
 		instrumentRepo: repository.NewInstrumentRepository(db),
 		state:          stateManager,
-		logger:         logger,
 	}
 }
 
@@ -77,8 +71,7 @@ func (s *IndexService) UpdateNSEIndices() (int64, error) {
 	lastUpdatedAt, err := s.state.Get("indices_updated_at")
 	if err == nil {
 		if !s.isUpdateIndicesRequired(lastUpdatedAt) {
-			// update log with logger
-			s.logger.Info("Indices update not required", map[string]interface{}{
+			zaplogger.Info("Indices update not required", zaplogger.Fields{
 				"lastUpdatedAt": lastUpdatedAt,
 			})
 			return 0, nil
@@ -86,15 +79,12 @@ func (s *IndexService) UpdateNSEIndices() (int64, error) {
 	}
 
 	// update log with logger
-	s.logger.Info("Indices update required", map[string]interface{}{
+	zaplogger.Info("Indices update required", zaplogger.Fields{
 		"lastUpdatedAt": lastUpdatedAt,
 	})
 
 	// truncate table
 	if err := s.repo.TruncateIndicesTable(); err != nil {
-		s.logger.Error("Failed to truncate table", map[string]interface{}{
-			"error": err,
-		})
 		return 0, fmt.Errorf("failed to truncate table: %v", err)
 	}
 
@@ -102,9 +92,6 @@ func (s *IndexService) UpdateNSEIndices() (int64, error) {
 	var totalInserted int64
 	indices, err := s.GetNSEIndexNamesFromNSEIndicesFileMap()
 	if err != nil {
-		s.logger.Error("Failed to get indices", map[string]interface{}{
-			"error": err,
-		})
 		return 0, fmt.Errorf("failed to get indices: %v", err)
 	}
 
@@ -113,19 +100,11 @@ func (s *IndexService) UpdateNSEIndices() (int64, error) {
 		// get records for index
 		indexRecords, err := s.FetchNSEIndexInstruments(index)
 		if err != nil {
-			s.logger.Error("Failed to get instruments for index", map[string]interface{}{
-				"indexindex": index,
-				"error":      err,
-			})
 			return 0, fmt.Errorf("failed to get instruments for index %s: %v", index, err)
 		}
 
 		count, err := s.repo.InsertIndices(indexRecords)
 		if err != nil {
-			s.logger.Error("Failed to insert instruments for index", map[string]interface{}{
-				"index": index,
-				"error": err,
-			})
 			return 0, fmt.Errorf("failed to create instruments for index %s: %v", index, err)
 		}
 		totalInserted += count
@@ -134,30 +113,18 @@ func (s *IndexService) UpdateNSEIndices() (int64, error) {
 
 	// update state after all indices have been updated
 	if err := s.state.Set("indices_updated_at", time.Now().Format("2006-01-02 15:04:05")); err != nil {
-		s.logger.Error("Failed to update state", map[string]interface{}{
-			"error": err,
-		})
 		return 0, fmt.Errorf("failed to update state: %v", err)
 	}
 
-	// update log with logger
-	s.logger.Info("Indices updated", map[string]interface{}{
+	zaplogger.Info("Indices updated", zaplogger.Fields{
 		"totalInserted": totalInserted,
 	})
 
 	// get indices record count
 	recordCount, err := s.repo.GetIndicesRecordCount()
 	if err != nil {
-		s.logger.Error("Failed to get indices record count", map[string]interface{}{
-			"error": err,
-		})
 		return 0, fmt.Errorf("failed to get indices record count: %v", err)
 	}
-
-	// insert record count in logs
-	s.logger.Info("Indices record count", map[string]interface{}{
-		"recordCount": recordCount,
-	})
 
 	return recordCount, nil
 
@@ -199,10 +166,6 @@ func (s *IndexService) FetchNSEIndexInstruments(indexName string) ([]models.Inde
 	// create request
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
-		s.logger.Error("Failed to create request for index", map[string]interface{}{
-			"index_name": indexName,
-			"error":      err,
-		})
 		return nil, fmt.Errorf("failed to create request for index %s: %v", indexName, err)
 	}
 
@@ -215,10 +178,6 @@ func (s *IndexService) FetchNSEIndexInstruments(indexName string) ([]models.Inde
 	// make request
 	resp, err := s.client.Do(req)
 	if err != nil {
-		s.logger.Error("Failed to download CSV for index", map[string]interface{}{
-			"index_name": indexName,
-			"error":      err,
-		})
 		return nil, fmt.Errorf("failed to download CSV for index %s: %v", indexName, err)
 	}
 	defer resp.Body.Close()
@@ -226,10 +185,6 @@ func (s *IndexService) FetchNSEIndexInstruments(indexName string) ([]models.Inde
 	reader := csv.NewReader(resp.Body)
 	records, err := reader.ReadAll()
 	if err != nil {
-		s.logger.Error("Failed to parse CSV for index", map[string]interface{}{
-			"index_name": indexName,
-			"error":      err,
-		})
 		return nil, fmt.Errorf("failed to parse CSV for index %s: %v", indexName, err)
 	}
 

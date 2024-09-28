@@ -11,39 +11,18 @@ import (
 	"github.com/nsvirk/moneybotsapi/internal/config"
 	"github.com/nsvirk/moneybotsapi/internal/repository"
 	"github.com/nsvirk/moneybotsapi/internal/service"
-	"github.com/nsvirk/moneybotsapi/pkg/utils/logger"
 	"github.com/nsvirk/moneybotsapi/pkg/utils/zaplogger"
-	"gorm.io/gorm"
 )
 
 func main() {
-	// Setup logger
-	defer zaplogger.Sync()
-	zaplogger.SetLogLevel("debug")
-
-	// startUpMessage
-	zaplogger.Info(config.SingleLine)
-	zaplogger.Info("Moneybots API")
-
 	// Load configuration
 	cfg, err := config.Get()
 	if err != nil {
-		zaplogger.Fatal("failed to load configuration", zaplogger.Fields{"error": err})
-	} else {
-		zaplogger.Info("  * loaded")
+		log.Fatalf("Failed to load configuration: %v", err)
 	}
-	zaplogger.Info(config.SingleLine)
 
 	// Print the configuration
 	fmt.Println(cfg.String())
-
-	// Create a new Echo instance
-	e := echo.New()
-	e.HideBanner = true
-	e.HidePort = true
-
-	// Setup middleware
-	middleware.SetupLoggerMiddleware(e)
 
 	// Connect to Postgres
 	db, err := repository.ConnectPostgres(cfg)
@@ -57,6 +36,29 @@ func main() {
 		log.Fatalf("Failed to connect to Redis: %v", err)
 	}
 
+	// Init logger
+	err = zaplogger.InitLogger(db)
+	if err != nil {
+		log.Fatalf("Failed to initialize logger: %v", err)
+	}
+
+	// Setup logger
+	defer zaplogger.Sync()
+	zaplogger.SetLogLevel(cfg.ServerLogLevel)
+
+	// startUpMessage
+	zaplogger.Info(cfg.APIName + " - " + cfg.APIVersion + " initialized")
+	zaplogger.Info("Postgres initialized")
+	zaplogger.Info("Redis initialized")
+
+	// Create a new Echo instance
+	e := echo.New()
+	e.HideBanner = true
+	e.HidePort = true
+
+	// Setup middleware
+	middleware.SetupLoggerMiddleware(e)
+
 	// Setup routes
 	api.SetupRoutes(e, db, redisClient)
 
@@ -69,35 +71,15 @@ func main() {
 	go publishService.PublishTicksToRedisChannel()
 
 	// Start the server
-	startServer(e, cfg, db)
+	startServer(e, cfg)
 
 }
 
 // startServer starts the Echo server on the specified port
-func startServer(e *echo.Echo, cfg *config.Config, db *gorm.DB) {
-	// Initialize the logger - logs will be stored in the database
-	logger, err := logger.New(db, "MAIN")
-	if err != nil {
-		panic(err)
-	}
-
+func startServer(e *echo.Echo, cfg *config.Config) {
 	port := cfg.ServerPort
 	if port == "" {
 		port = "3007"
 	}
-
-	// Database log
-	logger.Info("Server started", map[string]interface{}{
-		"name":    cfg.APIName,
-		"version": cfg.APIVersion,
-		"port":    port,
-	})
-
-	// Console log
-	startupMessage := fmt.Sprintf("%s %s Server [:%s] started", cfg.APIName, cfg.APIVersion, cfg.ServerPort)
-	zaplogger.Info(config.SingleLine)
-	zaplogger.Info(startupMessage)
-	zaplogger.Info(config.SingleLine)
-	e.Logger.Infof(startupMessage)
 	e.Logger.Fatal(e.Start(":" + port))
 }

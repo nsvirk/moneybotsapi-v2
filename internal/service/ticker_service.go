@@ -14,8 +14,6 @@ import (
 	kiteticker "github.com/nsvirk/gokiteticker"
 	"github.com/nsvirk/moneybotsapi/internal/models"
 	"github.com/nsvirk/moneybotsapi/internal/repository"
-	"github.com/nsvirk/moneybotsapi/pkg/utils/logger"
-	"github.com/nsvirk/moneybotsapi/pkg/utils/zaplogger"
 	"github.com/redis/go-redis/v9"
 
 	"gorm.io/gorm"
@@ -32,6 +30,13 @@ const (
 	monitorInterval                 = 10 * time.Second
 )
 
+type UpsertQueriedInstrumentsResult struct {
+	Queried  int64
+	Inserted int64
+	Updated  int64
+	Total    int64
+}
+
 type TickerService struct {
 	repo              *repository.TickerRepository
 	redisClient       *redis.Client
@@ -44,15 +49,10 @@ type TickerService struct {
 	cancel            context.CancelFunc
 	instrumentService *InstrumentService
 	indexService      *IndexService
-	logger            *logger.Logger
 }
 
 // NewService creates a new TickerService
 func NewTickerService(db *gorm.DB, redisClient *redis.Client) *TickerService {
-	logger, err := logger.New(db, "TICKER SERVICE")
-	if err != nil {
-		zaplogger.Error("failed to create ticker logger", zaplogger.Fields{"error": err})
-	}
 	ctx, cancel := context.WithCancel(context.Background())
 	return &TickerService{
 		repo:              repository.NewTickerRepository(db),
@@ -64,7 +64,6 @@ func NewTickerService(db *gorm.DB, redisClient *redis.Client) *TickerService {
 		cancel:            cancel,
 		instrumentService: NewInstrumentService(db),
 		indexService:      NewIndexService(db),
-		logger:            logger,
 	}
 }
 
@@ -402,7 +401,9 @@ func (s *TickerService) TruncateTickerInstruments() (int64, error) {
 }
 
 // UpsertQueriedInstruments upserts the queried instruments
-func (s *TickerService) UpsertQueriedInstruments(userID, exchange, tradingsymbol, name, expiry, strike, segment, instrumentType string) (map[string]interface{}, error) {
+func (s *TickerService) UpsertQueriedInstruments(userID, exchange, tradingsymbol, name, expiry, strike, segment, instrumentType string) (UpsertQueriedInstrumentsResult, error) {
+
+	var result UpsertQueriedInstrumentsResult
 	// query instrumetns using instruments service
 	queryInstrumentsParams := models.QueryInstrumentsParams{
 		Exchange:       exchange,
@@ -416,7 +417,7 @@ func (s *TickerService) UpsertQueriedInstruments(userID, exchange, tradingsymbol
 	details := "it"
 	queriedInstruments, err := s.instrumentService.QueryInstruments(queryInstrumentsParams, details)
 	if err != nil {
-		return nil, err
+		return result, err
 	}
 
 	// convert queried instruments to []tokens
@@ -437,26 +438,17 @@ func (s *TickerService) UpsertQueriedInstruments(userID, exchange, tradingsymbol
 	// upsert the queried instruments
 	insertedCount, updatedCount, err := s.repo.UpsertTickerInstruments(userID, instrumentsTokenMap)
 	if err != nil {
-		return nil, err
+		return result, err
 	}
 
-	response := map[string]interface{}{
-		"user_id":  userID,
-		"queried":  len(queriedInstruments),
-		"inserted": insertedCount,
-		"updated":  updatedCount,
+	result = UpsertQueriedInstrumentsResult{
+		Queried:  int64(len(queriedInstruments)),
+		Inserted: insertedCount,
+		Updated:  updatedCount,
+		Total:    insertedCount + updatedCount,
 	}
 
-	return response, nil
-}
-
-// GetNFOFilterMonths gets the NFO filter months
-func (s *TickerService) GetNFOFilterMonths() (string, string, string) {
-	now := time.Now()
-	month0 := strings.ToUpper(now.Format("06Jan"))
-	month1 := strings.ToUpper(now.AddDate(0, 1, 0).Format("06Jan"))
-	month2 := strings.ToUpper(now.AddDate(0, 2, 0).Format("06Jan"))
-	return month0, month1, month2
+	return result, nil
 }
 
 // monitorTickerChannel monitors the ticker channel

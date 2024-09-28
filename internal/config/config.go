@@ -7,8 +7,6 @@ import (
 	"reflect"
 	"strings"
 	"sync"
-
-	"github.com/nsvirk/moneybotsapi/pkg/utils/zaplogger"
 )
 
 // Config represents the application configuration
@@ -32,6 +30,7 @@ type Config struct {
 
 var (
 	SingleLine string = "--------------------------------------------------"
+	DoubleLine string = "=================================================="
 )
 
 var (
@@ -42,9 +41,6 @@ var (
 
 // Get returns the application configuration
 func Get() (*Config, error) {
-	zaplogger.Info(SingleLine)
-	zaplogger.Info("Loading Configuration")
-
 	once.Do(func() {
 		instance, err = loadConfig()
 	})
@@ -86,9 +82,10 @@ func (c *Config) loadFromEnv() error {
 // String returns the configuration as a string
 func (c *Config) String() string {
 	var sb strings.Builder
-	sb.WriteString("\n--------------------------------------\n")
-	sb.WriteString("Configuration:\n")
-	sb.WriteString("--------------------------------------\n")
+
+	sb.WriteString(SingleLine + "\n")
+	sb.WriteString("Config: \n")
+	sb.WriteString(SingleLine + "\n")
 
 	t := reflect.TypeOf(*c)
 	v := reflect.ValueOf(*c)
@@ -102,7 +99,7 @@ func (c *Config) String() string {
 		sb.WriteString(fmt.Sprintf("  %s:  %s\n", field.Name, value))
 	}
 
-	sb.WriteString("--------------------------------------\n")
+	sb.WriteString(SingleLine + "\n")
 
 	return sb.String()
 }

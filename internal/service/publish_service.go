@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/lib/pq"
-	"github.com/nsvirk/moneybotsapi/pkg/utils/logger"
 	"github.com/nsvirk/moneybotsapi/pkg/utils/zaplogger"
 	"github.com/redis/go-redis/v9"
 	"gorm.io/gorm"
@@ -19,19 +18,14 @@ type PublishService struct {
 	db          *gorm.DB
 	redisClient *redis.Client
 	pgConnStr   string
-	logger      *logger.Logger
 }
 
 func NewPublishService(db *gorm.DB, redisClient *redis.Client, pgConnStr string) *PublishService {
-	logger, err := logger.New(db, "PUBLISH SERVICE")
-	if err != nil {
-		zaplogger.Error("failed to create publish logger", zaplogger.Fields{"error": err})
-	}
+
 	return &PublishService{
 		db:          db,
 		redisClient: redisClient,
 		pgConnStr:   pgConnStr,
-		logger:      logger,
 	}
 }
 
@@ -41,17 +35,8 @@ func (s *PublishService) PublishTicksToRedisChannel() {
 	listener := pq.NewListener(s.pgConnStr, 10*time.Second, time.Minute, nil)
 	err := listener.Listen(PostgresChannel)
 	if err != nil {
-		s.logger.Error("Failed to create listener", map[string]interface{}{
-			"Postgres Channel": PostgresChannel,
-			"error":            err,
-		})
 		return
 	}
-
-	s.logger.Info("Starting to Publish", map[string]interface{}{
-		"Postgres Channel": PostgresChannel,
-		"Redis Channel":    RedisChannel,
-	})
 
 	ctx := context.Background()
 
@@ -61,21 +46,14 @@ func (s *PublishService) PublishTicksToRedisChannel() {
 			// Publish the notification to Redis
 			err := s.redisClient.Publish(ctx, RedisChannel, n.Extra).Err()
 			if err != nil {
-				s.logger.Error("Failed to publish to Redis", map[string]interface{}{
-					"Postgres Channel": PostgresChannel,
-					"Redis Channel":    RedisChannel,
-					"error":            err,
-				})
+				zaplogger.Error("Failed to publish to Redis", zaplogger.Fields{"error": err})
 			}
 		case <-time.After(90 * time.Second):
 			go func() {
 				err := listener.Ping()
 				if err != nil {
-					s.logger.Error("Error pinging PostgreSQL", map[string]interface{}{
-						"Postgres Channel": PostgresChannel,
-						"Redis Channel":    RedisChannel,
-						"error":            err,
-					})
+
+					zaplogger.Error("Error pinging PostgreSQL", zaplogger.Fields{"error": err})
 				}
 			}()
 		}
