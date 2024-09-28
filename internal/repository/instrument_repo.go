@@ -96,6 +96,14 @@ func (r *InstrumentRepository) QueryInstruments(qip models.QueryInstrumentsParam
 		query = query.Where("tradingsymbol = ?", qip.Tradingsymbol)
 	}
 
+	if qip.InstrumentToken != "" {
+		instrumentToken, err := strconv.ParseUint(qip.InstrumentToken, 10, 32)
+		if err != nil {
+			return nil, err
+		}
+		query = query.Where("instrument_token = ?", uint32(instrumentToken))
+	}
+
 	if qip.Name != "" {
 		query = query.Where("name = ?", qip.Name)
 	}
@@ -198,38 +206,38 @@ func (r *InstrumentRepository) GetInstrumentByExchangeTradingsymbols(exchange st
 	return instruments, err
 }
 
-// GetOptionChainNames returns a list of exchange:name for a given expiry
-func (r *InstrumentRepository) GetOptionChainNames(expiry string) ([]string, error) {
-	var exchangeNames []string
+// GetOptionsExchangeNames returns a list of exchange:name for a given expiry
+func (r *InstrumentRepository) GetOptionsExchangeNames(expiry string) ([]models.InstrumentModel, error) {
+	var instruments []models.InstrumentModel
 	err := r.DB.Model(&models.InstrumentModel{}).
-		Select("DISTINCT CONCAT(exchange, ':', name) AS exchange_name").
+		Select("DISTINCT exchange, name").
 		Where("expiry = ?", expiry).
-		Pluck("exchange_name", &exchangeNames).
+		Find(&instruments).
 		Error
-	return exchangeNames, err
+	return instruments, err
 }
 
 // GetOptionChainInstruments returns a list of instruments for a given exchange, name and expiry
 func (r *InstrumentRepository) GetOptionChainInstruments(exchange, name, expiry string) ([]models.InstrumentModel, error) {
 	// get fut instruments
-	var futInstruments []models.InstrumentModel
-	instrumentType := "FUT"
-	err := r.DB.Where("instrument_type = ? AND exchange = ? AND name = ? AND expiry >= ? ORDER BY expiry ASC LIMIT 1", instrumentType, exchange, name, expiry).Find(&futInstruments).Error
-	if err != nil {
-		return nil, err
-	}
+	// var futInstruments []models.InstrumentModel
+	// instrumentType := "FUT"
+	// err := r.DB.Where("instrument_type = ? AND exchange = ? AND name = ? AND expiry >= ? ORDER BY expiry ASC LIMIT 1", instrumentType, exchange, name, expiry).Find(&futInstruments).Error
+	// if err != nil {
+	// 	return nil, err
+	// }
 
 	// get the opt instruments
 	var optInstruments []models.InstrumentModel
 	instrumentTypes := []string{"CE", "PE"}
-	err = r.DB.Where("instrument_type IN (?) AND exchange = ? AND name = ? AND expiry = ?", instrumentTypes, exchange, name, expiry).Find(&optInstruments).Error
+	err := r.DB.Where("instrument_type IN (?) AND exchange = ? AND name = ? AND expiry = ?", instrumentTypes, exchange, name, expiry).Find(&optInstruments).Error
 	if err != nil {
 		return nil, err
 	}
 
 	// append the instruments
-	ocInstruments := append(futInstruments, optInstruments...)
+	// ocInstruments := append(futInstruments, optInstruments...)
 
-	return ocInstruments, nil
+	return optInstruments, nil
 
 }

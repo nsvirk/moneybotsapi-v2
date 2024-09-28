@@ -4,6 +4,7 @@ package handlers
 import (
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/labstack/echo/v4"
@@ -35,7 +36,7 @@ func NewIndicesHandler(db *gorm.DB) *IndicesHandler {
 
 // UpdateIndices updates the indices in the database
 func (h *IndicesHandler) UpdateIndices(c echo.Context) error {
-	totalInserted, err := h.IndexService.UpdateNSEIndices()
+	totalInserted, err := h.IndexService.UpdateIndices()
 	if err != nil {
 		return response.ErrorResponse(c, http.StatusInternalServerError, "ServerException", err.Error())
 	}
@@ -48,9 +49,14 @@ func (h *IndicesHandler) UpdateIndices(c echo.Context) error {
 	return response.SuccessResponse(c, responseData)
 }
 
-// GetIndexNames returns a list of index names
+// GetIndexNames returns a list of index names for a given exchange
 func (h *IndicesHandler) GetIndexNames(c echo.Context) error {
-	indices, err := h.IndexService.GetNSEIndexNames()
+	exchange := c.Param("exchange")
+	if exchange == "" {
+		return response.ErrorResponse(c, http.StatusBadRequest, "InputException", "`exchange` is required")
+	}
+
+	indices, err := h.IndexService.GetIndexNames(exchange)
 	if err != nil {
 		return response.ErrorResponse(c, http.StatusInternalServerError, "ServerException", err.Error())
 	}
@@ -59,17 +65,34 @@ func (h *IndicesHandler) GetIndexNames(c echo.Context) error {
 
 // GetIndexInstruments returns a list of instruments for a given list of index names
 func (h *IndicesHandler) GetIndexInstruments(c echo.Context) error {
-	index := c.FormValue("index")
-	details := c.FormValue("details")
-
-	if index == "" {
-		return response.ErrorResponse(c, http.StatusBadRequest, "InputException", "No `index` provided")
+	index := c.Param("index")
+	// details is optional and is only used for full
+	urlPath := c.Request().URL.Path
+	var details string
+	if strings.Contains(urlPath, "/full") {
+		details = "full"
 	}
 
-	instruments, err := h.IndexService.GetNSEIndexInstruments(index, details)
+	if index == "" {
+		return response.ErrorResponse(c, http.StatusBadRequest, "InputException", "`index` is required")
+	}
+
+	instruments, err := h.IndexService.GetIndexInstruments(index, details)
 	if err != nil {
 		return response.ErrorResponse(c, http.StatusInternalServerError, "ServerException", fmt.Sprintf("Error fetching instruments for index %s: %v", index, err))
 	}
 
-	return response.SuccessResponse(c, instruments)
+	// make result as per details value
+	result := make([]interface{}, len(instruments))
+	if details == "full" {
+		for i, instrument := range instruments {
+			result[i] = instrument
+		}
+	} else {
+		for i, instrument := range instruments {
+			result[i] = fmt.Sprintf("%s:%s:%d", instrument.Exchange, instrument.Tradingsymbol, instrument.InstrumentToken)
+		}
+	}
+
+	return response.SuccessResponse(c, result)
 }

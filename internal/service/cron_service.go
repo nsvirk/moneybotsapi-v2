@@ -2,6 +2,7 @@
 package service
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -132,7 +133,7 @@ func (cs *CronService) apiInstrumentsUpdateJob() {
 
 func (cs *CronService) apiIndicesUpdateJob() {
 	jobName := "API Indices UPDATE Job "
-	rowsInserted, err := cs.indexService.UpdateNSEIndices()
+	rowsInserted, err := cs.indexService.UpdateIndices()
 	if err != nil {
 		zaplogger.Error(jobName, zaplogger.Fields{
 			"error": err.Error(),
@@ -217,7 +218,7 @@ func (cs *CronService) tickerDataTruncateJob() {
 // tickerInstrumentsUpdateJob updates the ticker instruments
 func (cs *CronService) tickerInstrumentsUpdateJob() {
 	jobName := "TickerInstruments UPDATE Job "
-	userID := cs.cfg.KitetickerUserID
+	userId := cs.cfg.KitetickerUserID
 	var grandTotalInserted int64 = 0
 
 	// Truncate the table
@@ -291,7 +292,7 @@ func (cs *CronService) tickerInstrumentsUpdateJob() {
 	// Process each query
 	for _, q := range queries {
 
-		result, err := cs.tickerService.UpsertQueriedInstruments(userID, q.exchange, q.tradingsymbol, q.name, q.expiry, q.strike, q.segment, q.instrumentType)
+		result, err := cs.tickerService.UpsertQueriedInstruments(userId, q.exchange, q.tradingsymbol, q.name, q.expiry, q.strike, q.segment, q.instrumentType)
 		if err != nil {
 			zaplogger.Error(jobName, zaplogger.Fields{
 				"step":  "UpsertQueriedInstruments-Instruments",
@@ -311,13 +312,12 @@ func (cs *CronService) tickerInstrumentsUpdateJob() {
 	}
 
 	// -----------------------------------
-	// Add Indices
+	// Add All Indices
 	// -----------------------------------
-
-	indices, err := cs.indexService.GetNSEIndexNamesFromNSEIndicesFileMap()
+	indices, err := cs.indexService.GetAllIndexNames()
 	if err != nil {
 		zaplogger.Error(jobName, zaplogger.Fields{
-			"step":  "GetNSEIndexNamesFromNSEIndicesFileMap",
+			"step":  "GetIndexNames",
 			"error": err.Error(),
 		})
 		return
@@ -327,7 +327,7 @@ func (cs *CronService) tickerInstrumentsUpdateJob() {
 	var idxQueried, idxInserted, idxUpdated, idxTotal int64 = 0, 0, 0, 0
 	for _, indexName := range indices {
 
-		indexInstruments, err := cs.indexService.GetNSEIndexInstruments(indexName, "i")
+		indexInstruments, err := cs.indexService.GetIndexInstruments(indexName, "i")
 		if err != nil {
 			zaplogger.Error(jobName, zaplogger.Fields{
 				"step":  "GetNSEIndexInstruments",
@@ -344,15 +344,13 @@ func (cs *CronService) tickerInstrumentsUpdateJob() {
 		idxUpdated = 0
 		idxTotal = 0
 		for _, instrument := range indexInstruments {
-			// format is exchange:tradingsymbol
-			instrumentDetails := instrument.(string)
-			exchange := strings.Split(instrumentDetails, ":")[0]
-			tradingsymbol := strings.Split(instrumentDetails, ":")[1]
-			result, err := cs.tickerService.UpsertQueriedInstruments(userID, exchange, tradingsymbol, "", "", "", "", "")
+			exchange := instrument.Exchange
+			tradingsymbol := instrument.Tradingsymbol
+			result, err := cs.tickerService.UpsertQueriedInstruments(userId, exchange, tradingsymbol, "", "", "", "", "")
 			if err != nil {
 				zaplogger.Error(indexName, zaplogger.Fields{
 					"step":       "UpsertQueriedInstruments-Indices",
-					"instrument": instrumentDetails,
+					"instrument": fmt.Sprintf("%s:%s", exchange, tradingsymbol),
 					"error":      err.Error(),
 				})
 				failedInstruments = append(failedInstruments, tradingsymbol)
@@ -385,7 +383,7 @@ func (cs *CronService) tickerInstrumentsUpdateJob() {
 	}
 
 	// Log the ticker instrument count
-	totalTickerInstruments, err := cs.tickerService.GetTickerInstrumentCount(userID)
+	totalTickerInstruments, err := cs.tickerService.GetTickerInstrumentCount(userId)
 	if err != nil {
 		zaplogger.Error(jobName+"FAILED", zaplogger.Fields{
 			"step":  "GetTickerInstrumentCount",

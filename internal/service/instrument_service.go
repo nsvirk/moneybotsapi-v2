@@ -16,6 +16,8 @@ import (
 	"gorm.io/gorm"
 )
 
+var instrumentsUpdatedAtKey = "INSTRUMENTS_UPDATED_AT"
+
 // InstrumentService is the service for managing instruments
 type InstrumentService struct {
 	repo  *repository.InstrumentRepository
@@ -37,18 +39,18 @@ func NewInstrumentService(db *gorm.DB) *InstrumentService {
 // UpdateInstruments updates the instruments in the database
 func (s *InstrumentService) UpdateInstruments() (int64, error) {
 	// check if update is required
-	lastUpdatedAt, err := s.state.Get("instruments_updated_at")
+	instrumentsUpdatedAtValue, err := s.state.Get(instrumentsUpdatedAtKey)
 	if err == nil {
-		if !s.isUpdateInstrumentsRequired(lastUpdatedAt) {
+		if !s.isUpdateInstrumentsRequired(instrumentsUpdatedAtValue) {
 			zaplogger.Info("Instruments update not required", zaplogger.Fields{
-				"lastUpdatedAt": lastUpdatedAt,
+				instrumentsUpdatedAtKey: instrumentsUpdatedAtValue,
 			})
 			return 0, nil
 		}
 	}
 
 	zaplogger.Info("Instruments update required", zaplogger.Fields{
-		"lastUpdatedAt": lastUpdatedAt,
+		instrumentsUpdatedAtKey: instrumentsUpdatedAtValue,
 	})
 
 	// get instruments from kite
@@ -91,7 +93,7 @@ func (s *InstrumentService) UpdateInstruments() (int64, error) {
 	}
 
 	// update state after all instruments have been updated
-	if err := s.state.Set("instruments_updated_at", time.Now().Format("2006-01-02 15:04:05")); err != nil {
+	if err := s.state.Set(instrumentsUpdatedAtKey, time.Now().Format("2006-01-02 15:04:05")); err != nil {
 		return 0, fmt.Errorf("failed to update state: %v", err)
 	}
 
@@ -176,34 +178,8 @@ func (s *InstrumentService) GetInstrumentToTokenMap(instruments []string) (map[s
 }
 
 // QueryInstruments queries the instruments table
-func (s *InstrumentService) QueryInstruments(queryInstrumentsParams models.QueryInstrumentsParams, details string) ([]interface{}, error) {
-
-	instruments, err := s.repo.QueryInstruments(queryInstrumentsParams)
-	if err != nil {
-		return nil, err
-	}
-
-	// make result as per details value
-	result := make([]interface{}, len(instruments))
-	if details == "t" {
-		for i, instrument := range instruments {
-			result[i] = fmt.Sprintf("%d", instrument.InstrumentToken)
-		}
-	} else if details == "i" {
-		for i, instrument := range instruments {
-			result[i] = fmt.Sprintf("%s:%s", instrument.Exchange, instrument.Tradingsymbol)
-		}
-	} else if details == "it" {
-		for i, instrument := range instruments {
-			result[i] = fmt.Sprintf("%s:%s:%d", instrument.Exchange, instrument.Tradingsymbol, instrument.InstrumentToken)
-		}
-	} else {
-		for i, instrument := range instruments {
-			result[i] = instrument
-		}
-	}
-
-	return result, nil
+func (s *InstrumentService) QueryInstruments(queryInstrumentsParams models.QueryInstrumentsParams) ([]models.InstrumentModel, error) {
+	return s.repo.QueryInstruments(queryInstrumentsParams)
 }
 
 // GetInstrumentsByExchange queries the instruments table by exchange and returns a list of instruments
@@ -229,4 +205,14 @@ func (s *InstrumentService) GetInstrumentsByExpiry(expiry string) ([]models.Inst
 // GetExchangeNamesByExpiry queries the instruments table by expiry and returns a list of distinct exchange, names
 func (s *InstrumentService) GetExchangeNamesByExpiry(expiry string) ([]models.InstrumentModel, error) {
 	return s.repo.GetExchangeNamesByExpiry(expiry)
+}
+
+// GetOptionsExchangeNames returns a list of exchange:name for a given expiry
+func (s *InstrumentService) GetOptionsExchangeNames(expiry string) ([]models.InstrumentModel, error) {
+	return s.repo.GetOptionsExchangeNames(expiry)
+}
+
+// GetOptionChainInstruments returns a list of instruments for a given exchange, name and expiry
+func (s *InstrumentService) GetOptionChainInstruments(exchange, name, expiry string) ([]models.InstrumentModel, error) {
+	return s.repo.GetOptionChainInstruments(exchange, name, expiry)
 }

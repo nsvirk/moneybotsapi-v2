@@ -14,11 +14,11 @@ import (
 	"gorm.io/gorm"
 )
 
-// var NSEIndicesBaseURL = "https://nsearchives.nseindia.com/content/indices/"
-// var NSEIndicesBaseURL = "https://niftyindices.com/IndexConstituent/"
-var NSEIndicesBaseURL = "https://raw.githubusercontent.com/nsvirk/nseindicesdata/refs/heads/main/csvfiles/"
+// var nseIndicesBaseURL = "https://nsearchives.nseindia.com/content/indices/"
+// var nseIndicesBaseURL = "https://niftyindices.com/IndexConstituent/"
+var nseIndicesBaseURL = "https://raw.githubusercontent.com/nsvirk/nseindicesdata/refs/heads/main/csvfiles/"
 
-var NSEIndicesFileMap = map[string]string{
+var nseIndicesFileMap = map[string]string{
 	"NSE:NIFTY 50":                 "ind_nifty50list.csv",
 	"NSE:NIFTY NEXT 50":            "ind_niftynext50list.csv",
 	"NSE:NIFTY 100":                "ind_nifty100list.csv",
@@ -40,6 +40,8 @@ var NSEIndicesFileMap = map[string]string{
 	"NSE:NIFTY CONSUMER DURABLES":  "ind_niftyconsumerdurableslist.csv",
 	"NSE:NIFTY OIL GAS":            "ind_niftyoilgaslist.csv",
 }
+
+var nseIndicesUpdatedAtKey = "NSE_INDICES_UPDATED_AT"
 
 // IndexService is the service for managing indices
 type IndexService struct {
@@ -64,15 +66,65 @@ func NewIndexService(db *gorm.DB) *IndexService {
 	}
 }
 
+// GetAllIndexNames returns the names of all indices
+func (s *IndexService) GetAllIndexNames() ([]string, error) {
+	return s.repo.GetAllIndexNames()
+}
+
+// GetIndexNames returns the names of all indices for a given exchange
+func (s *IndexService) GetIndexNames(exchange string) ([]string, error) {
+	return s.repo.GetIndexNames(exchange)
+}
+
+// GetIndexInstruments returns the instruments for a given index
+func (s *IndexService) GetIndexInstruments(indexName, details string) ([]models.InstrumentModel, error) {
+	indexRecords, err := s.repo.GetIndexInstruments(indexName)
+	if err != nil {
+		return nil, err
+	}
+
+	// get instruments from index repo
+	var exchange string
+	indexTradingsymbols := make([]string, len(indexRecords))
+	for i, indexRecord := range indexRecords {
+		exchange = indexRecord.Exchange
+		indexTradingsymbols[i] = indexRecord.Tradingsymbol
+	}
+
+	// get instruments from instrument repo
+	instruments, err := s.instrumentRepo.GetInstrumentByExchangeTradingsymbols(exchange, indexTradingsymbols)
+	if err != nil {
+		return nil, err
+	}
+
+	return instruments, nil
+}
+
+// UpdateIndices updates the indices in the database
+func (s *IndexService) UpdateIndices() (int64, error) {
+	var grandTotalInserted int64
+	// update NSE indices
+	totalInserted, err := s.updateNSEIndices()
+	if err != nil {
+		return 0, fmt.Errorf("failed to update NSE indices: %v", err)
+	}
+	grandTotalInserted += totalInserted
+
+	// Update Other indices
+	// ToDo
+
+	return grandTotalInserted, nil
+}
+
 // UpdateNSEIndices fetches the instruments for a given NSE index and updates the database
-func (s *IndexService) UpdateNSEIndices() (int64, error) {
+func (s *IndexService) updateNSEIndices() (int64, error) {
 
 	// check if update is required
-	lastUpdatedAt, err := s.state.Get("indices_updated_at")
+	nseIndicesUpdatedAtValue, err := s.state.Get(nseIndicesUpdatedAtKey)
 	if err == nil {
-		if !s.isUpdateIndicesRequired(lastUpdatedAt) {
+		if !s.isUpdateIndicesRequired(nseIndicesUpdatedAtValue) {
 			zaplogger.Info("Indices update not required", zaplogger.Fields{
-				"lastUpdatedAt": lastUpdatedAt,
+				nseIndicesUpdatedAtKey: nseIndicesUpdatedAtValue,
 			})
 			return 0, nil
 		}
@@ -80,7 +132,7 @@ func (s *IndexService) UpdateNSEIndices() (int64, error) {
 
 	// update log with logger
 	zaplogger.Info("Indices update required", zaplogger.Fields{
-		"lastUpdatedAt": lastUpdatedAt,
+		nseIndicesUpdatedAtKey: nseIndicesUpdatedAtValue,
 	})
 
 	// truncate table
@@ -90,15 +142,19 @@ func (s *IndexService) UpdateNSEIndices() (int64, error) {
 
 	// get instruments for all indices
 	var totalInserted int64
-	indices, err := s.GetNSEIndexNamesFromNSEIndicesFileMap()
-	if err != nil {
-		return 0, fmt.Errorf("failed to get indices: %v", err)
+	var indices []string
+	for index := range nseIndicesFileMap {
+		indices = append(indices, index)
+	}
+
+	if len(indices) == 0 {
+		return 0, fmt.Errorf("no indices found in nseIndicesFileMap")
 	}
 
 	// update indices
 	for _, index := range indices {
 		// get records for index
-		indexRecords, err := s.FetchNSEIndexInstruments(index)
+		indexRecords, err := s.fetchNSEIndexInstruments(index)
 		if err != nil {
 			return 0, fmt.Errorf("failed to get instruments for index %s: %v", index, err)
 		}
@@ -112,22 +168,15 @@ func (s *IndexService) UpdateNSEIndices() (int64, error) {
 	}
 
 	// update state after all indices have been updated
-	if err := s.state.Set("indices_updated_at", time.Now().Format("2006-01-02 15:04:05")); err != nil {
+	if err := s.state.Set(nseIndicesUpdatedAtKey, time.Now().Format("2006-01-02 15:04:05")); err != nil {
 		return 0, fmt.Errorf("failed to update state: %v", err)
 	}
 
-	zaplogger.Info("Indices updated", zaplogger.Fields{
+	zaplogger.Info("NSE Indices updated", zaplogger.Fields{
 		"totalInserted": totalInserted,
 	})
 
-	// get indices record count
-	recordCount, err := s.repo.GetIndicesRecordCount()
-	if err != nil {
-		return 0, fmt.Errorf("failed to get indices record count: %v", err)
-	}
-
-	return recordCount, nil
-
+	return totalInserted, nil
 }
 
 // isUpdateIndicesRequired checks if the indices need to be updated
@@ -148,20 +197,20 @@ func (s *IndexService) isUpdateIndicesRequired(lastUpdatedAt string) bool {
 	return true
 }
 
-// FetchNSEIndexInstruments fetches the instruments for a given NSE index
-func (s *IndexService) FetchNSEIndexInstruments(indexName string) ([]models.IndexModel, error) {
+// fetchNSEIndexInstruments fetches the instruments for a given NSE index
+func (s *IndexService) fetchNSEIndexInstruments(indexName string) ([]models.IndexModel, error) {
 
 	// -------------------------------------------------------------------------------------------------
 	// make request to index url
 	// -------------------------------------------------------------------------------------------------
 	// get index csv file name
-	indexCsvFile, ok := NSEIndicesFileMap[indexName]
+	indexCsvFile, ok := nseIndicesFileMap[indexName]
 	if !ok {
 		return nil, fmt.Errorf("invalid index: %s", indexName)
 	}
 
 	// make url
-	url := fmt.Sprintf("%s%s", NSEIndicesBaseURL, indexCsvFile)
+	url := fmt.Sprintf("%s%s", nseIndicesBaseURL, indexCsvFile)
 
 	// create request
 	req, err := http.NewRequest("GET", url, nil)
@@ -206,62 +255,4 @@ func (s *IndexService) FetchNSEIndexInstruments(indexName string) ([]models.Inde
 	}
 
 	return indexRecords, nil
-}
-
-// GetNSEIndexNamesFromFileMap fetches the names of all NSE indices from NSEIndicesFileMap
-func (s *IndexService) GetNSEIndexNamesFromNSEIndicesFileMap() ([]string, error) {
-	var indices []string
-	for index := range NSEIndicesFileMap {
-		indices = append(indices, index)
-	}
-	return indices, nil
-}
-
-// GetNSEIndexNames returns the names of all NSE indices
-func (s *IndexService) GetNSEIndexNames() ([]string, error) {
-	return s.repo.GetNSEIndexNames()
-}
-
-// GetNSEIndexInstruments fetches the instruments for a given NSE index
-func (s *IndexService) GetNSEIndexInstruments(indexName, details string) ([]interface{}, error) {
-	indexRecords, err := s.repo.GetNSEIndexInstruments(indexName)
-	if err != nil {
-		return nil, err
-	}
-
-	// get instruments from index repo
-	var exchange string
-	indexTradingsymbols := make([]string, len(indexRecords))
-	for i, indexRecord := range indexRecords {
-		exchange = indexRecord.Exchange
-		indexTradingsymbols[i] = indexRecord.Tradingsymbol
-	}
-
-	// get instruments from instrument repo
-	instruments, err := s.instrumentRepo.GetInstrumentByExchangeTradingsymbols(exchange, indexTradingsymbols)
-	if err != nil {
-		return nil, err
-	}
-
-	// make result as per details value
-	result := make([]interface{}, len(instruments))
-	if details == "t" {
-		for i, instrument := range instruments {
-			result[i] = fmt.Sprintf("%d", instrument.InstrumentToken)
-		}
-	} else if details == "i" {
-		for i, instrument := range instruments {
-			result[i] = fmt.Sprintf("%s:%s", instrument.Exchange, instrument.Tradingsymbol)
-		}
-	} else if details == "it" {
-		for i, instrument := range instruments {
-			result[i] = fmt.Sprintf("%s:%s:%d", instrument.Exchange, instrument.Tradingsymbol, instrument.InstrumentToken)
-		}
-	} else {
-		for i, instrument := range instruments {
-			result[i] = instrument
-		}
-	}
-
-	return result, nil
 }

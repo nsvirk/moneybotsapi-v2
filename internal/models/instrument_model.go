@@ -30,11 +30,12 @@ func (InstrumentModel) TableName() string {
 
 // QueryInstrumentsParams is the parameters for the QueryInstruments endpoint
 type QueryInstrumentsParams struct {
-	Exchange       string `query:"exchange"`
-	Tradingsymbol  string `query:"tradingsymbol"`
-	Name           string `query:"name"`
-	Expiry         string `query:"expiry"`
-	Strike         string `query:"strike"`
-	Segment        string `query:"segment"`
-	InstrumentType string `query:"instrument_type"`
+	Exchange        string
+	Tradingsymbol   string
+	InstrumentToken string
+	Name            string
+	Expiry          string
+	Strike          string
+	Segment         string
+	InstrumentType  string
 }

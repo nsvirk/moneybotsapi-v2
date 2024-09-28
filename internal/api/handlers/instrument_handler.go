@@ -2,9 +2,11 @@
 package handlers
 
 import (
+	"fmt"
 	"net/http"
 	"regexp"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/labstack/echo/v4"
@@ -49,60 +51,6 @@ func (h *InstrumentHandler) UpdateInstruments(c echo.Context) error {
 	return response.SuccessResponse(c, responseData)
 }
 
-// GetInstrumentsByExchange queries the instruments table by exchange and returns a list of instruments
-func (h *InstrumentHandler) GetInstrumentsByExchange(c echo.Context) error {
-	exchange := c.Param("exchange")
-
-	if len(exchange) == 0 {
-		return response.ErrorResponse(c, http.StatusBadRequest, "InputException", "No `exchange` provided")
-	}
-
-	instruments, err := h.InstrumentService.GetInstrumentsByExchange(exchange)
-	if err != nil {
-		return response.ErrorResponse(c, http.StatusInternalServerError, "ServerException", err.Error())
-	}
-
-	return response.SuccessResponse(c, instruments)
-}
-
-// GetInstrumentsByTradingsymbol queries the instruments table by tradingsymbol and returns a list of instruments
-func (h *InstrumentHandler) GetInstrumentsByTradingsymbol(c echo.Context) error {
-
-	tradingsymbol := c.Param("tradingsymbol")
-
-	if len(tradingsymbol) == 0 {
-		return response.ErrorResponse(c, http.StatusBadRequest, "InputException", "No `exchange` provided")
-	}
-
-	instruments, err := h.InstrumentService.GetInstrumentsByTradingsymbol(tradingsymbol)
-	if err != nil {
-		return response.ErrorResponse(c, http.StatusInternalServerError, "ServerException", err.Error())
-	}
-
-	return response.SuccessResponse(c, instruments)
-}
-
-// GetInstrumentsByInstrumentToken queries the instruments table by instrument token and returns a list of instruments
-func (h *InstrumentHandler) GetInstrumentsByInstrumentToken(c echo.Context) error {
-	instrumentToken := c.Param("instrument_token")
-
-	if instrumentToken == "" || instrumentToken == ":instrument_token" {
-		return response.ErrorResponse(c, http.StatusBadRequest, "InputException", "No `instrument_token` provided")
-	}
-
-	// check if its a digit
-	if !regexp.MustCompile(`^\d+$`).MatchString(instrumentToken) {
-		return response.ErrorResponse(c, http.StatusBadRequest, "InputException", "Invalid `instrument_token` format")
-	}
-
-	instruments, err := h.InstrumentService.GetInstrumentsByInstrumentToken(instrumentToken)
-	if err != nil {
-		return response.ErrorResponse(c, http.StatusInternalServerError, "ServerException", err.Error())
-	}
-
-	return response.SuccessResponse(c, instruments)
-}
-
 // GetInstrumentsByExpiry queries the instruments table by expiry and returns a list of instruments
 func (h *InstrumentHandler) GetInstrumentsByExpiry(c echo.Context) error {
 	expiry := c.Param("expiry")
@@ -119,8 +67,8 @@ func (h *InstrumentHandler) GetInstrumentsByExpiry(c echo.Context) error {
 	return response.SuccessResponse(c, instruments)
 }
 
-// GetExchangeNamesByExpiry queries the instruments table by expiry and returns a list of distinct exchange, names
-func (h *InstrumentHandler) GetExchangeNamesByExpiry(c echo.Context) error {
+// GetExchangeNames queries the instruments table by expiry and returns a list of distinct exchange, names
+func (h *InstrumentHandler) GetExchangeNames(c echo.Context) error {
 	expiry := c.Param("expiry")
 
 	if len(expiry) == 0 {
@@ -152,15 +100,21 @@ func (h *InstrumentHandler) GetExchangeNamesByExpiry(c echo.Context) error {
 
 // QueryInstruments returns a list of instruments for a given exchange, tradingsymbol, expiry, strike and segment
 func (h *InstrumentHandler) QueryInstruments(c echo.Context) error {
-	// get the exchange, tradingsymbol, expiry, strike and segment from the request
-	exchange := c.FormValue("exchange")
-	tradingsymbol := c.FormValue("tradingsymbol")
-	name := c.FormValue("name")
-	expiry := c.FormValue("expiry")
-	strike := c.FormValue("strike")
-	segment := c.FormValue("segment")
-	instrumentType := c.FormValue("instrument_type")
-	details := c.FormValue("details")
+	// get the exchange, tradingsymbol, instrument_token, name, expiry, strike and segment from the request
+	exchange := c.QueryParam("exchange")
+	tradingsymbol := c.QueryParam("tradingsymbol")
+	instrumentToken := c.QueryParam("instrument_token")
+	name := c.QueryParam("name")
+	expiry := c.QueryParam("expiry")
+	strike := c.QueryParam("strike")
+	segment := c.QueryParam("segment")
+	instrumentType := c.QueryParam("instrument_type")
+	details := c.QueryParam("details")
+
+	// check instrumentToken is all digits
+	if len(instrumentToken) > 0 && !regexp.MustCompile(`^\d+$`).MatchString(instrumentToken) {
+		return response.ErrorResponse(c, http.StatusBadRequest, "InputException", "Invalid `instrument_token` value, must be digits")
+	}
 
 	// check if expiry is input and is a valid date
 	if len(expiry) > 0 {
@@ -185,21 +139,42 @@ func (h *InstrumentHandler) QueryInstruments(c echo.Context) error {
 	}
 
 	queryInstrumentsParams := models.QueryInstrumentsParams{
-		Exchange:       exchange,
-		Tradingsymbol:  tradingsymbol,
-		Name:           name,
-		Expiry:         expiry,
-		Strike:         strike,
-		Segment:        segment,
-		InstrumentType: instrumentType,
+		Exchange:        exchange,
+		Tradingsymbol:   tradingsymbol,
+		InstrumentToken: instrumentToken,
+		Name:            name,
+		Expiry:          expiry,
+		Strike:          strike,
+		Segment:         segment,
+		InstrumentType:  instrumentType,
 	}
 
-	instruments, err := h.InstrumentService.QueryInstruments(queryInstrumentsParams, details)
+	instruments, err := h.InstrumentService.QueryInstruments(queryInstrumentsParams)
 	if err != nil {
 		return response.ErrorResponse(c, http.StatusInternalServerError, "ServerException", err.Error())
 	}
 
-	return response.SuccessResponse(c, instruments)
+	// make result as per details value
+	result := make([]interface{}, len(instruments))
+	if details == "t" {
+		for i, instrument := range instruments {
+			result[i] = fmt.Sprintf("%d", instrument.InstrumentToken)
+		}
+	} else if details == "i" {
+		for i, instrument := range instruments {
+			result[i] = fmt.Sprintf("%s:%s", instrument.Exchange, instrument.Tradingsymbol)
+		}
+	} else if details == "it" {
+		for i, instrument := range instruments {
+			result[i] = fmt.Sprintf("%s:%s:%d", instrument.Exchange, instrument.Tradingsymbol, instrument.InstrumentToken)
+		}
+	} else {
+		for i, instrument := range instruments {
+			result[i] = instrument
+		}
+	}
+
+	return response.SuccessResponse(c, result)
 }
 
 // GetInstrumentSymbols returns a list of instrument symbols for a given list of instrument tokens
@@ -241,4 +216,86 @@ func (h *InstrumentHandler) GetInstrumentToTokenMap(c echo.Context) error {
 	}
 
 	return response.SuccessResponse(c, instrumentMap)
+}
+
+// GetOptionsExchangeNames returns a list of exchange:name for a given expiry
+func (h *InstrumentHandler) GetOptionsExchangeNames(c echo.Context) error {
+	expiry := c.Param("expiry")
+	if len(expiry) == 0 {
+		return response.ErrorResponse(c, http.StatusBadRequest, "InputException", "No `expiry` provided")
+	}
+
+	// check if expiry is valid date
+	_, err := time.Parse("2006-01-02", expiry)
+	if err != nil {
+		return response.ErrorResponse(c, http.StatusBadRequest, "InputException", "Invalid `expiry` format")
+	}
+
+	instruments, err := h.InstrumentService.GetOptionsExchangeNames(expiry)
+	if err != nil {
+		return response.ErrorResponse(c, http.StatusInternalServerError, "ServerException", err.Error())
+	}
+
+	if len(instruments) > 0 {
+		// create a map of exchange to names
+		responseData := make(map[string][]string, len(instruments))
+		for _, instrument := range instruments {
+			responseData[instrument.Exchange] = append(responseData[instrument.Exchange], instrument.Name)
+		}
+		return response.SuccessResponse(c, responseData)
+	}
+
+	return response.SuccessResponse(c, instruments)
+}
+
+// GetOptionChainInstruments returns a list of instruments for a given exchange, name and expiry
+func (h *InstrumentHandler) GetOptionChainInstruments(c echo.Context) error {
+	exchange := c.Param("exchange")
+	name := c.Param("name")
+	expiry := c.Param("expiry")
+	// details is optional and is only used for full
+	urlPath := c.Request().URL.Path
+	var details string
+	if strings.Contains(urlPath, "/full") {
+		details = "full"
+	}
+
+	// check if exchange is provided
+	if len(exchange) == 0 {
+		return response.ErrorResponse(c, http.StatusBadRequest, "InputException", "`exchange` is required")
+	}
+
+	// check if name is provided
+	if len(name) == 0 {
+		return response.ErrorResponse(c, http.StatusBadRequest, "InputException", "`name` is required")
+	}
+
+	// check if expiry is provided
+	if len(expiry) == 0 {
+		return response.ErrorResponse(c, http.StatusBadRequest, "InputException", "`expiry` is required")
+	}
+
+	// check if expiry is valid date
+	_, err := time.Parse("2006-01-02", expiry)
+	if err != nil {
+		return response.ErrorResponse(c, http.StatusBadRequest, "InputException", "Invalid `expiry` format, must be a valid date")
+	}
+
+	instruments, err := h.InstrumentService.GetOptionChainInstruments(exchange, name, expiry)
+	if err != nil {
+		return response.ErrorResponse(c, http.StatusInternalServerError, "ServerException", err.Error())
+	}
+	// make result as per details value
+	result := make([]interface{}, len(instruments))
+	if details == "full" {
+		for i, instrument := range instruments {
+			result[i] = instrument
+		}
+	} else {
+		for i, instrument := range instruments {
+			result[i] = fmt.Sprintf("%s:%s:%d", instrument.Exchange, instrument.Tradingsymbol, instrument.InstrumentToken)
+		}
+	}
+
+	return response.SuccessResponse(c, result)
 }

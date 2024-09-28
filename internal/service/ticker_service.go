@@ -6,8 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
-	"strconv"
-	"strings"
 	"sync"
 	"time"
 
@@ -414,25 +412,18 @@ func (s *TickerService) UpsertQueriedInstruments(userID, exchange, tradingsymbol
 		Segment:        segment,
 		InstrumentType: instrumentType,
 	}
-	details := "it"
-	queriedInstruments, err := s.instrumentService.QueryInstruments(queryInstrumentsParams, details)
+	queriedInstruments, err := s.instrumentService.QueryInstruments(queryInstrumentsParams)
 	if err != nil {
 		return result, err
 	}
 
-	// convert queried instruments to []tokens
+	// convert queried instruments to instrumentsTokenMap
 	instrumentsTokenMap := make(map[string]uint32, len(queriedInstruments))
 	for _, instrument := range queriedInstruments {
-		// exchange:tradingsymbol:instrument_token
-		instrumentDetails := strings.Split(instrument.(string), ":")
-		exchange := instrumentDetails[0]
-		tradingsymbol := instrumentDetails[1]
-		instrumentTokenStr := instrumentDetails[2]
-		instrumentToken, err := strconv.ParseUint(instrumentTokenStr, 10, 32)
-		if err != nil {
-			// handle error
-		}
-		instrumentsTokenMap[exchange+":"+tradingsymbol] = uint32(instrumentToken)
+		exchange := instrument.Exchange
+		tradingsymbol := instrument.Tradingsymbol
+		instrumentToken := instrument.InstrumentToken
+		instrumentsTokenMap[exchange+":"+tradingsymbol] = instrumentToken
 	}
 
 	// upsert the queried instruments
