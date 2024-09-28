@@ -4,10 +4,10 @@ package handlers
 import (
 	"encoding/json"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/labstack/echo/v4"
+	"github.com/nsvirk/moneybotsapi/internal/api/middleware"
 	"github.com/nsvirk/moneybotsapi/internal/service"
 	"github.com/nsvirk/moneybotsapi/pkg/utils/response"
 )
@@ -24,16 +24,16 @@ func NewTickerHandler(service *service.TickerService) *TickerHandler {
 
 // TickerStart starts the ticker for the given user
 func (h *TickerHandler) TickerStart(c echo.Context) error {
-	userID, enctoken, err := extractAuthInfo(c)
+	userId, enctoken, err := middleware.GetUserIdEnctokenFromEchoContext(c)
 	if err != nil {
-		return err
+		return response.ErrorResponse(c, http.StatusUnauthorized, "AuthorizationException", err.Error())
 	}
 
-	if err := h.service.Start(userID, enctoken); err != nil {
+	if err := h.service.Start(userId, enctoken); err != nil {
 		return response.ErrorResponse(c, http.StatusInternalServerError, "TickerException", err.Error())
 	}
 
-	instruments, err := h.service.GetTickerInstruments(userID)
+	instruments, err := h.service.GetTickerInstruments(userId)
 	if err != nil {
 		return response.ErrorResponse(c, http.StatusInternalServerError, "DatabaseException", err.Error())
 	}
@@ -47,12 +47,12 @@ func (h *TickerHandler) TickerStart(c echo.Context) error {
 
 // TickerStop stops the ticker for the given user
 func (h *TickerHandler) TickerStop(c echo.Context) error {
-	userID, _, err := extractAuthInfo(c)
+	userId, _, err := middleware.GetUserIdEnctokenFromEchoContext(c)
 	if err != nil {
-		return err
+		return response.ErrorResponse(c, http.StatusUnauthorized, "AuthorizationException", err.Error())
 	}
 
-	if err := h.service.Stop(userID); err != nil {
+	if err := h.service.Stop(userId); err != nil {
 		return response.ErrorResponse(c, http.StatusBadRequest, "InputException", err.Error())
 	}
 
@@ -64,16 +64,16 @@ func (h *TickerHandler) TickerStop(c echo.Context) error {
 
 // TickerRestart restarts the ticker for the given user
 func (h *TickerHandler) TickerRestart(c echo.Context) error {
-	userID, enctoken, err := extractAuthInfo(c)
+	userId, enctoken, err := middleware.GetUserIdEnctokenFromEchoContext(c)
 	if err != nil {
-		return err
+		return response.ErrorResponse(c, http.StatusUnauthorized, "AuthorizationException", err.Error())
 	}
 
-	if err := h.service.Restart(userID, enctoken); err != nil {
+	if err := h.service.Restart(userId, enctoken); err != nil {
 		return response.ErrorResponse(c, http.StatusInternalServerError, "TickerException", err.Error())
 	}
 
-	instruments, err := h.service.GetTickerInstruments(userID)
+	instruments, err := h.service.GetTickerInstruments(userId)
 	if err != nil {
 		return response.ErrorResponse(c, http.StatusInternalServerError, "DatabaseException", err.Error())
 	}
@@ -96,11 +96,12 @@ func (h *TickerHandler) TickerStatus(c echo.Context) error {
 
 // GetTickerInstruments returns the instruments for the given user
 func (h *TickerHandler) GetTickerInstruments(c echo.Context) error {
-	userID, _, err := extractAuthInfo(c)
+	userId, _, err := middleware.GetUserIdEnctokenFromEchoContext(c)
 	if err != nil {
-		return err
+		return response.ErrorResponse(c, http.StatusUnauthorized, "AuthorizationException", err.Error())
 	}
-	tickerInstruments, err := h.service.GetTickerInstruments(userID)
+
+	tickerInstruments, err := h.service.GetTickerInstruments(userId)
 	if err != nil {
 		return response.ErrorResponse(c, http.StatusInternalServerError, "DatabaseException", "Failed to fetch instruments")
 	}
@@ -119,9 +120,9 @@ func (h *TickerHandler) GetTickerInstruments(c echo.Context) error {
 
 // AddTickerInstruments adds the given instruments to the ticker for the given user
 func (h *TickerHandler) AddTickerInstruments(c echo.Context) error {
-	userID, _, err := extractAuthInfo(c)
+	userId, _, err := middleware.GetUserIdEnctokenFromEchoContext(c)
 	if err != nil {
-		return err
+		return response.ErrorResponse(c, http.StatusUnauthorized, "AuthorizationException", err.Error())
 	}
 	var req struct {
 		Instruments []string `json:"instruments"`
@@ -130,12 +131,12 @@ func (h *TickerHandler) AddTickerInstruments(c echo.Context) error {
 		return response.ErrorResponse(c, http.StatusBadRequest, "InputException", "Invalid JSON body")
 	}
 
-	instruments, err := h.service.AddTickerInstruments(userID, req.Instruments)
+	instruments, err := h.service.AddTickerInstruments(userId, req.Instruments)
 	if err != nil {
 		return response.ErrorResponse(c, http.StatusInternalServerError, "DatabaseException", err.Error())
 	}
 
-	totalCount, _ := h.service.GetTickerInstrumentCount(userID)
+	totalCount, _ := h.service.GetTickerInstrumentCount(userId)
 
 	return response.SuccessResponse(c, map[string]interface{}{
 		"timestamp":   time.Now().Format(time.RFC3339),
@@ -146,9 +147,9 @@ func (h *TickerHandler) AddTickerInstruments(c echo.Context) error {
 
 // DeleteTickerInstruments deletes the given instruments from the ticker for the given user
 func (h *TickerHandler) DeleteTickerInstruments(c echo.Context) error {
-	userID, _, err := extractAuthInfo(c)
+	userId, _, err := middleware.GetUserIdEnctokenFromEchoContext(c)
 	if err != nil {
-		return err
+		return response.ErrorResponse(c, http.StatusUnauthorized, "AuthorizationException", err.Error())
 	}
 	var req struct {
 		Instruments []string `json:"instruments"`
@@ -162,7 +163,7 @@ func (h *TickerHandler) DeleteTickerInstruments(c echo.Context) error {
 		return response.ErrorResponse(c, http.StatusBadRequest, "InputException", "Instruments array cannot be empty")
 	}
 
-	deletedCount, err := h.service.DeleteTickerInstruments(userID, req.Instruments)
+	deletedCount, err := h.service.DeleteTickerInstruments(userId, req.Instruments)
 	if err != nil {
 		return response.ErrorResponse(c, http.StatusInternalServerError, "DatabaseException", err.Error())
 	}
@@ -171,14 +172,4 @@ func (h *TickerHandler) DeleteTickerInstruments(c echo.Context) error {
 		"deleted":   deletedCount,
 		"timestamp": time.Now().Format(time.RFC3339),
 	})
-}
-
-// extractAuthInfo extracts the userID and enctoken from the authorization header
-func extractAuthInfo(c echo.Context) (string, string, error) {
-	auth := c.Request().Header.Get("Authorization")
-	userID, enctoken, found := strings.Cut(auth, ":")
-	if !found {
-		return "", "", response.ErrorResponse(c, http.StatusUnauthorized, "InputException", "Invalid authorization header")
-	}
-	return userID, enctoken, nil
 }

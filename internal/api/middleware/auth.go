@@ -1,10 +1,12 @@
 package middleware
 
 import (
+	"errors"
 	"net/http"
 	"strings"
 
 	"github.com/labstack/echo/v4"
+	"github.com/nsvirk/moneybotsapi/internal/models"
 	"github.com/nsvirk/moneybotsapi/internal/service"
 	"github.com/nsvirk/moneybotsapi/pkg/utils/response"
 	"gorm.io/gorm"
@@ -14,30 +16,25 @@ import (
 func AuthMiddleware(db *gorm.DB) echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
-			auth := c.Request().Header.Get("Authorization")
-			if auth == "" {
-				return response.ErrorResponse(c, http.StatusUnauthorized, "AuthorizationException", "Missing Authorization header")
-			}
-
-			parts := strings.SplitN(auth, ":", 2)
-			if len(parts) != 2 {
-				return response.ErrorResponse(c, http.StatusUnauthorized, "AuthorizationException", "Invalid Authorization header format")
-			}
-
-			userID, enctoken := parts[0], parts[1]
-
-			sessionService := service.NewSessionService(db)
-			userSession, err := sessionService.VerifySession(userID, enctoken)
+			// Get the userId and enctoken from the authorization header
+			enctoken, err := ExtractEnctokenFromAuthHeader(c)
 			if err != nil {
-				return response.ErrorResponse(c, http.StatusUnauthorized, "AuthorizationException", "Invalid or expired session")
+				return response.ErrorResponse(c, http.StatusUnauthorized, "AuthorizationException", err.Error())
+			}
+
+			// Verify the session
+			sessionService := service.NewSessionService(db)
+			userSession, err := sessionService.VerifySession(enctoken)
+			if err != nil {
+				return response.ErrorResponse(c, http.StatusUnauthorized, "AuthorizationException", err.Error())
 			}
 
 			// Add session data to context for use in handlers
-			c.Set("user_id", userSession.UserID)
+			c.Set("user_id", userSession.UserId)
 			c.Set("enctoken", userSession.Enctoken)
 			c.Set("user_session", userSession)
 
-			// // Get from the context to verify that the data was set
+			// Get from the context to verify that the data was set
 			// userID = c.Get("user_id").(string)
 			// enctoken = c.Get("enctoken").(string)
 			// userSession = c.Get("user_session").(*models.SessionModel)
@@ -46,3 +43,73 @@ func AuthMiddleware(db *gorm.DB) echo.MiddlewareFunc {
 		}
 	}
 }
+
+// GetUserIdEnctokenFromEchoContext gets the userId and enctoken from the echo context
+func GetUserIdEnctokenFromEchoContext(c echo.Context) (string, string, error) {
+	userId, ok := c.Get("user_id").(string)
+	if !ok {
+		return "", "", errors.New("missing `user_id` in context")
+	}
+	enctoken, ok := c.Get("enctoken").(string)
+	if !ok {
+		return "", "", errors.New("missing `enctoken` in context")
+	}
+	return userId, enctoken, nil
+}
+
+// GetUserSessionFromEchoContext gets the user session from the echo context
+func GetUserSessionFromEchoContext(c echo.Context) (*models.SessionModel, error) {
+	userSession, ok := c.Get("user_session").(*models.SessionModel)
+	if !ok {
+		return nil, errors.New("missing `user_session` in context")
+	}
+	return userSession, nil
+}
+
+// ExtractEnctokenFromAuthHeader extracts the enctoken from the authorization header
+func ExtractEnctokenFromAuthHeader(c echo.Context) (string, error) {
+	// header format is <enctoken <enctoken>>
+	auth := c.Request().Header.Get("Authorization")
+	if auth == "" {
+		return "", errors.New("missing Authorization header")
+	}
+	// Split the authorization header into two parts on space
+	partsToken := strings.SplitN(auth, " ", 2)
+	if len(partsToken) != 2 {
+		return "", errors.New("invalid Authorization header format")
+	}
+	enctoken := partsToken[1]
+
+	return enctoken, nil
+
+}
+
+// // ExtractUserIdEnctokenFromAuthHeader gets the userId and enctoken from the authorization header
+// func ExtractUserIdEnctokenFromAuthHeader(c echo.Context) (string, string, error) {
+// 	// header format is <token user_id:enctoken>
+// 	auth := c.Request().Header.Get("Authorization")
+// 	if auth == "" {
+// 		return "", "", errors.New("missing Authorization header")
+// 	}
+// 	// Split the authorization header into two parts on space
+// 	partsToken := strings.SplitN(auth, " ", 2)
+// 	if len(partsToken) != 2 {
+// 		return "", "", errors.New("invalid Authorization header format")
+// 	}
+// 	token := partsToken[0]
+// 	userCredentials := partsToken[1]
+
+// 	if token != "token" {
+// 		return "", "", errors.New("invalid Authorization header format")
+// 	}
+
+// 	// Split the user credentials part futher into two parts on colon
+// 	partsUser := strings.SplitN(userCredentials, ":", 2)
+// 	if len(partsUser) != 2 {
+// 		return "", "", errors.New("invalid Authorization header format")
+// 	}
+// 	userId := partsUser[0]
+// 	enctoken := partsUser[1]
+
+// 	return userId, enctoken, nil
+// }

@@ -31,7 +31,6 @@ func SetupRoutes(e *echo.Echo, db *gorm.DB, redisClient *redis.Client) {
 	sessionGroup := api.Group("/session")
 	sessionGroup.POST("/login", sessionHandler.GenerateSession)
 	sessionGroup.POST("/totp", sessionHandler.GenerateTOTP)
-	sessionGroup.POST("/valid", sessionHandler.CheckSessionValid)
 
 	// Instrument routes (protected)
 	instrumentHandler := handlers.NewInstrumentHandler(db)

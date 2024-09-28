@@ -36,7 +36,7 @@ func (s *SessionService) GenerateSession(userId, password, totpValue string) (mo
 		return models.SessionModel{}, fmt.Errorf("`totp_value` is required")
 	}
 
-	existingSession, err := s.repo.GetSessionByUserID(userId)
+	existingSession, err := s.repo.GetSessionByUserId(userId)
 	if err == nil {
 		if err := bcrypt.CompareHashAndPassword([]byte(existingSession.HashedPassword), []byte(password)); err == nil {
 			isValid, err := s.kiteSession.CheckEnctokenValid(existingSession.Enctoken)
@@ -57,12 +57,12 @@ func (s *SessionService) GenerateSession(userId, password, totpValue string) (mo
 	}
 
 	newSession := models.SessionModel{
-		UserID:         session.UserID,
+		UserId:         session.UserID,
 		UserName:       session.Username,
 		UserShortname:  session.UserShortname,
-		AvatarURL:      session.AvatarURL,
+		AvatarUrl:      session.AvatarURL,
 		PublicToken:    session.PublicToken,
-		KFSession:      session.KFSession,
+		KfSession:      session.KFSession,
 		Enctoken:       session.Enctoken,
 		LoginTime:      session.LoginTime,
 		HashedPassword: string(hashedPassword),
@@ -94,19 +94,14 @@ func (s *SessionService) CheckSessionValid(enctoken string) (bool, error) {
 }
 
 // Used by the AuthMiddleware to verify the session
-// VerifySession verifies the session for the given user and enctoken
-func (s *SessionService) VerifySession(userID, enctoken string) (*models.SessionModel, error) {
-	session, err := s.repo.GetSessionByUserID(userID)
+// VerifySession verifies the session for the given enctoken
+func (s *SessionService) VerifySession(enctoken string) (*models.SessionModel, error) {
+	session, err := s.repo.GetSessionByEnctoken(enctoken)
 	if err != nil {
 		return nil, err
 	}
 
-	if session.Enctoken != enctoken {
-		return nil, fmt.Errorf("invalid enctoken")
-	}
-
-	// Optionally, you might want to check if the session is still valid
-	// This could involve checking an expiration time, or making an API call to verify the enctoken
+	// Verify if the session is still valid with KiteConnect API
 	isValid, err := s.kiteSession.CheckEnctokenValid(enctoken)
 	if err != nil || !isValid {
 		return nil, fmt.Errorf("expired or invalid session")

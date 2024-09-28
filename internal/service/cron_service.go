@@ -165,13 +165,13 @@ func (cs *CronService) tickerStartJob() {
 	}
 	zaplogger.Info(jobName, zaplogger.Fields{
 		"step":       "GenerateSession",
-		"user_id":    sessionData.UserID,
+		"user_id":    sessionData.UserId,
 		"enctoken":   sessionData.Enctoken[:4] + "..." + sessionData.Enctoken[len(sessionData.Enctoken)-4:],
 		"login_time": sessionData.LoginTime,
 	})
 
 	// Start the ticker
-	err = cs.tickerService.Start(sessionData.UserID, sessionData.Enctoken)
+	err = cs.tickerService.Start(sessionData.UserId, sessionData.Enctoken)
 	if err != nil {
 		zaplogger.Error(jobName, zaplogger.Fields{
 			"step":  "TickerStart",

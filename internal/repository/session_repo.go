@@ -2,6 +2,9 @@
 package repository
 
 import (
+	"errors"
+	"fmt"
+
 	"github.com/nsvirk/moneybotsapi/internal/models"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -24,11 +27,26 @@ func (r *SessionRepository) UpsertSession(session *models.SessionModel) error {
 	}).Create(session).Error
 }
 
-// GetSessionByUserID gets a session by user ID
-func (r *SessionRepository) GetSessionByUserID(userID string) (*models.SessionModel, error) {
+// GetSessionByUserId gets a session by user ID
+func (r *SessionRepository) GetSessionByUserId(userId string) (*models.SessionModel, error) {
 	var session models.SessionModel
-	err := r.DB.Where("user_id = ?", userID).First(&session).Error
+	err := r.DB.Where("user_id = ?", userId).First(&session).Error
 	if err != nil {
+		return nil, err
+	}
+	return &session, nil
+}
+
+// GetSessionByEnctoken gets a session by enctoken
+func (r *SessionRepository) GetSessionByEnctoken(enctoken string) (*models.SessionModel, error) {
+	var session models.SessionModel
+	err := r.DB.Where("enctoken = ?", enctoken).First(&session).Error
+
+	if err != nil {
+		// not found error
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, fmt.Errorf("session not found")
+		}
 		return nil, err
 	}
 	return &session, nil

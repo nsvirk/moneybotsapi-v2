@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/labstack/echo/v4"
+	"github.com/nsvirk/moneybotsapi/internal/api/middleware"
 	"github.com/nsvirk/moneybotsapi/internal/service"
 	"github.com/nsvirk/moneybotsapi/pkg/utils/response"
 	"gorm.io/gorm"
@@ -29,9 +30,9 @@ type StreamRequestBody struct {
 
 // StreamTickerData streams the ticker data for the given instruments
 func (h *StreamHandler) StreamTickerData(c echo.Context) error {
-	userId, enctoken, err := extractAuthInfo(c)
+	userId, enctoken, err := middleware.GetUserIdEnctokenFromEchoContext(c)
 	if err != nil {
-		return err
+		return response.ErrorResponse(c, http.StatusUnauthorized, "AuthorizationException", err.Error())
 	}
 
 	var req StreamRequestBody

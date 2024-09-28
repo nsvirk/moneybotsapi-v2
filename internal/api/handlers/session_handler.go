@@ -59,10 +59,13 @@ func (h *SessionHandler) GenerateSession(c echo.Context) error {
 // GenerateTOTP generates a TOTP value for the given secret
 func (h *SessionHandler) GenerateTOTP(c echo.Context) error {
 
+	// get the user_id and totp_secret from the request
+	userId := c.FormValue("user_id")
+	if userId == "" {
+		return response.ErrorResponse(c, http.StatusBadRequest, "InputException", "`user_id` is a required field")
+	}
 	// get the totp_secret from the request
 	totpSecret := c.FormValue("totp_secret")
-
-	// check if the totp_secret is present in the request
 	if totpSecret == "" {
 		return response.ErrorResponse(c, http.StatusBadRequest, "InputException", "`totp_secret` is a required field")
 	}
@@ -73,24 +76,5 @@ func (h *SessionHandler) GenerateTOTP(c echo.Context) error {
 		return response.ErrorResponse(c, http.StatusInternalServerError, "ServerException", err.Error())
 	}
 
-	return response.SuccessResponse(c, map[string]string{"totp_value": totpValue})
-}
-
-// CheckSessionValid checks if the given enctoken is valid
-func (h *SessionHandler) CheckSessionValid(c echo.Context) error {
-	// get the enctoken from the request
-	enctoken := c.FormValue("enctoken")
-
-	// check if the enctoken is present in the request
-	if enctoken == "" {
-		return response.ErrorResponse(c, http.StatusBadRequest, "InputException", "`enctoken` is a required field")
-	}
-
-	// check if the enctoken is valid
-	isValid, err := h.service.CheckSessionValid(enctoken)
-	if err != nil {
-		return response.ErrorResponse(c, http.StatusInternalServerError, "ServerException", err.Error())
-	}
-
-	return response.SuccessResponse(c, map[string]bool{"is_valid": isValid})
+	return response.SuccessResponse(c, map[string]string{"user_id": userId, "totp_value": totpValue})
 }
