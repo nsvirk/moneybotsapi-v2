@@ -64,6 +64,7 @@ func main() {
 
 	// Setup and start cron jobs
 	cronService := service.NewCronService(e, cfg, db, redisClient)
+	// start cron jobs
 	cronService.Start()
 
 	// Setup and start ticks
@@ -81,5 +82,7 @@ func startServer(e *echo.Echo, cfg *config.Config) {
 	if port == "" {
 		port = "3007"
 	}
+	zaplogger.Info("SERVER STARTED ON PORT " + port)
 	e.Logger.Fatal(e.Start(":" + port))
+
 }

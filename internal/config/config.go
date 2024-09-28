@@ -11,8 +11,9 @@ import (
 
 // Config represents the application configuration
 type Config struct {
-	APIName              string `env:"MB_API_APP_NAME"`
-	APIVersion           string `env:"MB_API_APP_VERSION"`
+	APIName              string `env:"MB_API_NAME"`
+	APIVersion           string `env:"MB_API_VERSION"`
+	APIUrl               string `env:"MB_API_URL"`
 	ServerPort           string `env:"MB_API_SERVER_PORT"`
 	ServerLogLevel       string `env:"MB_API_SERVER_LOG_LEVEL"`
 	PostgresDsn          string `env:"MB_API_PG_DSN"`

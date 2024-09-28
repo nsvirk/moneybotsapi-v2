@@ -158,7 +158,7 @@ func (cs *CronService) tickerStartJob() {
 			"step":        "GenerateSession",
 			"user_id":     userId,
 			"password":    password[:2] + "..." + password[len(password)-2:],
-			"totp_secret": totpSecret[:2] + "..." + totpSecret[len(totpSecret)-2:],
+			"totp_secret": totpSecret[:8] + "..." + totpSecret[len(totpSecret)-8:],
 			"error":       err.Error(),
 		})
 		return

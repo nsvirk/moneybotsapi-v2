@@ -18,7 +18,7 @@ type Response struct {
 // SuccessResponse sends a successful JSON response
 func SuccessResponse(c echo.Context, data interface{}) error {
 	return c.JSON(http.StatusOK, Response{
-		Status: "ok",
+		Status: "success",
 		Data:   data,
 	})
 }
