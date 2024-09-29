@@ -64,10 +64,17 @@ func (s *StreamService) RunTickerStream(ctx context.Context, c echo.Context, use
 		clientID = fmt.Sprintf("client-%d", time.Now().UnixNano())
 	}
 
-	tokenToInstrumentMap, tokens, err := s.prepareTokens(instruments)
+	// Prepare tokenMap for the given instruments
+	tokenMap, err := s.prepareTokenMap(instruments)
 	if err != nil {
 		errChan <- err
 		return
+	}
+
+	// Create tokens from the tokenMap
+	tokens := make([]uint32, 0, len(tokenMap))
+	for token := range tokenMap {
+		tokens = append(tokens, token)
 	}
 
 	clientChan := make(chan []byte, 100)
@@ -75,7 +82,7 @@ func (s *StreamService) RunTickerStream(ctx context.Context, c echo.Context, use
 		ID:          clientID,
 		Instruments: instruments,
 		Tokens:      tokens,
-		TokenMap:    tokenToInstrumentMap,
+		TokenMap:    tokenMap,
 		Channel:     clientChan,
 	}
 
@@ -208,24 +215,22 @@ func (s *StreamService) cleanupGlobalTokenMap() {
 	s.globalTokenMap = newGlobalTokenMap
 }
 
-// prepareTokens prepares the tokens for the given instruments
-func (s *StreamService) prepareTokens(strInstruments []string) (map[uint32]string, []uint32, error) {
-	instrumentToTokenMap, err := s.instrumentService.GetInstrumentToTokenMap(strInstruments)
+// prepareTokenMap prepares the token map for the given instruments
+func (s *StreamService) prepareTokenMap(instrumentsStr []string) (map[uint32]string, error) {
+	instruments, err := s.instrumentService.GetInstrumentsBySymbols(instrumentsStr)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get instrument tokens: %w", err)
+		return nil, fmt.Errorf("failed to get instrument token: %w", err)
 	}
-	tokens := make([]uint32, 0, len(instrumentToTokenMap))
-	tokenToInstrumentMap := make(map[uint32]string)
-	for instrument, token := range instrumentToTokenMap {
-		tokens = append(tokens, token)
-		tokenToInstrumentMap[token] = instrument
+	tokenMap := make(map[uint32]string)
+	for _, instrument := range instruments {
+		tokenMap[instrument.InstrumentToken] = fmt.Sprintf("%s:%s", instrument.Exchange, instrument.Tradingsymbol)
 	}
 
-	if len(tokens) == 0 {
-		return nil, nil, fmt.Errorf("no tokens to subscribe")
+	if len(tokenMap) == 0 {
+		return nil, fmt.Errorf("no tokens to subscribe")
 	}
 
-	return tokenToInstrumentMap, tokens, nil
+	return tokenMap, nil
 }
 
 // initTicker initializes the ticker

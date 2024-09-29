@@ -11,13 +11,13 @@ var IndexTableName = "indices"
 // Index represents a trading index
 type IndexModel struct {
 	ID            uint32    `gorm:"primaryKey;autoIncrement" json:"-"`
-	Index         string    `json:"index,omitempty" gorm:"index"`
-	Exchange      string    `json:"exchange,omitempty"`
-	Tradingsymbol string    `json:"tradingsymbol,omitempty" gorm:"index"`
-	CompanyName   string    `json:"company_name,omitempty"`
-	Industry      string    `json:"industry,omitempty" gorm:"index"`
-	Series        string    `json:"series,omitempty"`
-	ISINCode      string    `json:"isin_code,omitempty"`
+	Index         string    `json:"index" gorm:"index"`
+	Exchange      string    `json:"exchange"`
+	Tradingsymbol string    `json:"tradingsymbol" gorm:"index"`
+	CompanyName   string    `json:"company_name"`
+	Industry      string    `json:"industry" gorm:"index"`
+	Series        string    `json:"series"`
+	ISINCode      string    `json:"isin_code"`
 	UpdatedAt     time.Time `gorm:"autoUpdateTime" json:"-"`
 }
 

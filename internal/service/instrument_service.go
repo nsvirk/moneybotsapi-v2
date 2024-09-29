@@ -5,7 +5,6 @@ import (
 	"encoding/csv"
 	"fmt"
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
 
@@ -133,48 +132,33 @@ func (s *InstrumentService) isUpdateInstrumentsRequired(lastUpdatedAt string) bo
 	return true
 }
 
-// GetTokensToInstrumentMap returns a map of token to instrument
-func (s *InstrumentService) GetTokensToInstrumentMap(tokens []uint32) (map[string]string, error) {
-
-	instruments, err := s.repo.GetInstrumentsByTokens(tokens)
-	if err != nil {
-		return nil, err
-	}
-
-	tokenToInstrumentMap := make(map[string]string)
-	for _, instrument := range instruments {
-		tokenStr := strconv.FormatUint(uint64(instrument.InstrumentToken), 10)
-		tokenToInstrumentMap[tokenStr] = instrument.Exchange + ":" + instrument.Tradingsymbol
-	}
-
-	return tokenToInstrumentMap, nil
+// GetInstrumentsByTokens returns instruments for tokens
+func (s *InstrumentService) GetInstrumentsByTokens(tokens []uint32) ([]models.InstrumentModel, error) {
+	return s.repo.GetInstrumentsByTokens(tokens)
 }
 
-// GetInstrumentToTokenMap returns a map of instrument to token
-func (s *InstrumentService) GetInstrumentToTokenMap(instruments []string) (map[string]uint32, error) {
-
-	instrumentToTokenMap := make(map[string]uint32)
-	for _, symbol := range instruments {
+// GetInstrumentsBySymbols returns instruments for symbols
+func (s *InstrumentService) GetInstrumentsBySymbols(symbols []string) ([]models.InstrumentModel, error) {
+	instrumentsResponse := make([]models.InstrumentModel, 0, len(symbols))
+	for _, symbol := range symbols {
 		parts := strings.Split(strings.TrimSpace(symbol), ":")
 		if len(parts) != 2 {
-			return nil, fmt.Errorf("invalid instrument format: %s", symbol)
+			return nil, fmt.Errorf("invalid instrument format: %s", symbols)
 		}
-
 		exchange := strings.TrimSpace(parts[0])
 		tradingsymbol := strings.TrimSpace(parts[1])
 
 		instrument, err := s.repo.GetInstrumentByExchangeTradingsymbol(exchange, tradingsymbol)
 		if err != nil {
+			// Skip instruments that are not found
 			if err == gorm.ErrRecordNotFound {
-				// Skip instruments that are not found
 				continue
 			}
 			return nil, err
 		}
-		instrumentToTokenMap[symbol] = instrument.InstrumentToken
+		instrumentsResponse = append(instrumentsResponse, instrument)
 	}
-
-	return instrumentToTokenMap, nil
+	return instrumentsResponse, nil
 }
 
 // QueryInstruments queries the instruments table
@@ -202,17 +186,17 @@ func (s *InstrumentService) GetInstrumentsByExpiry(expiry string) ([]models.Inst
 	return s.repo.GetInstrumentsByExpiry(expiry)
 }
 
-// GetExchangeNamesByExpiry queries the instruments table by expiry and returns a list of distinct exchange, names
-func (s *InstrumentService) GetExchangeNamesByExpiry(expiry string) ([]models.InstrumentModel, error) {
-	return s.repo.GetExchangeNamesByExpiry(expiry)
+// GetFNOSegmentWiseName returns a list of segment wise name for a given expiry
+func (s *InstrumentService) GetFNOSegmentWiseName(expiry string) ([]models.InstrumentModel, error) {
+	return s.repo.GetFNOSegmentWiseName(expiry)
 }
 
-// GetOptionsExchangeNames returns a list of exchange:name for a given expiry
-func (s *InstrumentService) GetOptionsExchangeNames(expiry string) ([]models.InstrumentModel, error) {
-	return s.repo.GetOptionsExchangeNames(expiry)
+// GetFNOSegmentWiseExpiry returns a list of segment wise expiry for a given name
+func (s *InstrumentService) GetFNOSegmentWiseExpiry(name string, limit, offset int) ([]models.InstrumentModel, error) {
+	return s.repo.GetFNOSegmentWiseExpiry(name, limit, offset)
 }
 
-// GetOptionChainInstruments returns a list of instruments for a given exchange, name and expiry
-func (s *InstrumentService) GetOptionChainInstruments(exchange, name, expiry string) ([]models.InstrumentModel, error) {
-	return s.repo.GetOptionChainInstruments(exchange, name, expiry)
+// GetFNOOptionChain returns the option chain for a given instrument
+func (s *InstrumentService) GetFNOOptionChain(exchange, name, futExpiry, optExpiry string) ([]models.InstrumentModel, error) {
+	return s.repo.GetFNOOptionChain(exchange, name, futExpiry, optExpiry)
 }

@@ -338,24 +338,24 @@ func (s *TickerService) TruncateTickerData() error {
 }
 
 // AddTickerInstruments adds the ticker instruments
-func (s *TickerService) AddTickerInstruments(userID string, instruments []string) (map[string]interface{}, error) {
+func (s *TickerService) AddTickerInstruments(userID string, instrumentsStr []string) (map[string]interface{}, error) {
 
-	// make instrumentsTokensMap using instrument service
-	instrumentsTokensMap, err := s.instrumentService.GetInstrumentToTokenMap(instruments)
+	// get instruments using instrument service
+	instruments, err := s.instrumentService.GetInstrumentsBySymbols(instrumentsStr)
 	if err != nil {
 		return nil, err
 	}
 
-	// find missing instruments
+	// find missing instruments, those instrumentsStr which are not in instruments
 	missingInstruments := make([]string, 0)
 	for _, instrument := range instruments {
-		if _, ok := instrumentsTokensMap[instrument]; !ok {
-			missingInstruments = append(missingInstruments, instrument)
+		if instrument.InstrumentToken == 0 {
+			missingInstruments = append(missingInstruments, instrument.Tradingsymbol)
 		}
 	}
 
 	// upsert the instruments
-	insertedCount, updatedCount, err := s.repo.UpsertTickerInstruments(userID, instrumentsTokensMap)
+	insertedCount, updatedCount, err := s.repo.UpsertTickerInstruments(userID, instruments)
 	if err != nil {
 		return nil, err
 	}
@@ -416,18 +416,8 @@ func (s *TickerService) UpsertQueriedInstruments(userID, exchange, tradingsymbol
 	if err != nil {
 		return result, err
 	}
-
-	// convert queried instruments to instrumentsTokenMap
-	instrumentsTokenMap := make(map[string]uint32, len(queriedInstruments))
-	for _, instrument := range queriedInstruments {
-		exchange := instrument.Exchange
-		tradingsymbol := instrument.Tradingsymbol
-		instrumentToken := instrument.InstrumentToken
-		instrumentsTokenMap[exchange+":"+tradingsymbol] = instrumentToken
-	}
-
 	// upsert the queried instruments
-	insertedCount, updatedCount, err := s.repo.UpsertTickerInstruments(userID, instrumentsTokenMap)
+	insertedCount, updatedCount, err := s.repo.UpsertTickerInstruments(userID, queriedInstruments)
 	if err != nil {
 		return result, err
 	}

@@ -4,7 +4,6 @@ package handlers
 import (
 	"fmt"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/labstack/echo/v4"
@@ -63,36 +62,53 @@ func (h *IndicesHandler) GetIndexNames(c echo.Context) error {
 	return response.SuccessResponse(c, indices)
 }
 
-// GetIndexInstruments returns a list of instruments for a given list of index names
-func (h *IndicesHandler) GetIndexInstruments(c echo.Context) error {
+// GetIndexTokens returns a list of tokens for a given index name
+func (h *IndicesHandler) GetIndexTokens(c echo.Context) error {
 	index := c.Param("index")
-	// details is optional and is only used for full
-	urlPath := c.Request().URL.Path
-	var details string
-	if strings.Contains(urlPath, "/full") {
-		details = "full"
-	}
-
 	if index == "" {
 		return response.ErrorResponse(c, http.StatusBadRequest, "InputException", "`index` is required")
 	}
+	instruments, err := h.IndexService.GetIndexInstruments(index)
+	if err != nil {
+		return response.ErrorResponse(c, http.StatusInternalServerError, "ServerException", fmt.Sprintf("Error getting instruments for index %s: %v", index, err))
+	}
+	result := make([]string, len(instruments))
+	for i, instrument := range instruments {
+		result[i] = fmt.Sprintf("%d", instrument.InstrumentToken)
+	}
+	return response.SuccessResponse(c, result)
+}
 
-	instruments, err := h.IndexService.GetIndexInstruments(index, details)
+// GetIndexSymbols returns a list of symbols for a given index name
+func (h *IndicesHandler) GetIndexSymbols(c echo.Context) error {
+	index := c.Param("index")
+	if index == "" {
+		return response.ErrorResponse(c, http.StatusBadRequest, "InputException", "`index` is required")
+	}
+	instruments, err := h.IndexService.GetIndexInstruments(index)
+	if err != nil {
+		return response.ErrorResponse(c, http.StatusInternalServerError, "ServerException", fmt.Sprintf("Error getting instruments for index %s: %v", index, err))
+	}
+	result := make([]string, len(instruments))
+	for i, instrument := range instruments {
+		result[i] = fmt.Sprintf("%s:%s", instrument.Exchange, instrument.Tradingsymbol)
+	}
+	return response.SuccessResponse(c, result)
+}
+
+// GetIndexInstruments returns a list of instruments for a given list of index names
+func (h *IndicesHandler) GetIndexInstruments(c echo.Context) error {
+	index := c.Param("index")
+	if index == "" {
+		return response.ErrorResponse(c, http.StatusBadRequest, "InputException", "`index` is required")
+	}
+	instruments, err := h.IndexService.GetIndexInstruments(index)
 	if err != nil {
 		return response.ErrorResponse(c, http.StatusInternalServerError, "ServerException", fmt.Sprintf("Error fetching instruments for index %s: %v", index, err))
 	}
-
-	// make result as per details value
-	result := make([]interface{}, len(instruments))
-	if details == "full" {
-		for i, instrument := range instruments {
-			result[i] = instrument
-		}
-	} else {
-		for i, instrument := range instruments {
-			result[i] = fmt.Sprintf("%s:%s:%d", instrument.Exchange, instrument.Tradingsymbol, instrument.InstrumentToken)
-		}
+	result := make(map[string]interface{}, len(instruments))
+	for _, instrument := range instruments {
+		result[fmt.Sprintf("%s:%s", instrument.Exchange, instrument.Tradingsymbol)] = instrument
 	}
-
 	return response.SuccessResponse(c, result)
 }

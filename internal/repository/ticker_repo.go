@@ -58,11 +58,11 @@ func (r *TickerRepository) TruncateTickerInstruments() (int64, error) {
 }
 
 // UpsertTickerInstruments upserts the instruments
-func (r *TickerRepository) UpsertTickerInstruments(userID string, instrumentsTokenMap map[string]uint32) (int64, int64, error) {
+func (r *TickerRepository) UpsertTickerInstruments(userID string, instruments []models.InstrumentModel) (int64, int64, error) {
 	var insertedCount int64
 	var updatedCount int64
 
-	for instrument, token := range instrumentsTokenMap {
+	for _, instrument := range instruments {
 		result := r.DB.Clauses(clause.OnConflict{
 			Columns: []clause.Column{
 				{Name: "user_id"},
@@ -71,8 +71,8 @@ func (r *TickerRepository) UpsertTickerInstruments(userID string, instrumentsTok
 			DoUpdates: clause.AssignmentColumns([]string{"instrument_token", "updated_at"}),
 		}).Create(&models.TickerInstrument{
 			UserID:          userID,
-			Instrument:      instrument,
-			InstrumentToken: token,
+			Instrument:      instrument.Exchange + ":" + instrument.Tradingsymbol,
+			InstrumentToken: uint32(instrument.InstrumentToken),
 			UpdatedAt:       time.Now(),
 		})
 

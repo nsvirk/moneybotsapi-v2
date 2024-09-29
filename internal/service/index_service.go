@@ -77,7 +77,7 @@ func (s *IndexService) GetIndexNames(exchange string) ([]string, error) {
 }
 
 // GetIndexInstruments returns the instruments for a given index
-func (s *IndexService) GetIndexInstruments(indexName, details string) ([]models.InstrumentModel, error) {
+func (s *IndexService) GetIndexInstruments(indexName string) ([]models.InstrumentModel, error) {
 	indexRecords, err := s.repo.GetIndexInstruments(indexName)
 	if err != nil {
 		return nil, err

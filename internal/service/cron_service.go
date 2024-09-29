@@ -327,7 +327,7 @@ func (cs *CronService) tickerInstrumentsUpdateJob() {
 	var idxQueried, idxInserted, idxUpdated, idxTotal int64 = 0, 0, 0, 0
 	for _, indexName := range indices {
 
-		indexInstruments, err := cs.indexService.GetIndexInstruments(indexName, "i")
+		indexInstruments, err := cs.indexService.GetIndexInstruments(indexName)
 		if err != nil {
 			zaplogger.Error(jobName, zaplogger.Fields{
 				"step":  "GetNSEIndexInstruments",

@@ -136,15 +136,13 @@ func (r *InstrumentRepository) QueryInstruments(qip models.QueryInstrumentsParam
 	return instruments, nil
 }
 
-// GetExchangeNamesByExpiry queries the instruments table by expiry and returns a list of distinct exchange, names
-func (r *InstrumentRepository) GetExchangeNamesByExpiry(expiry string) ([]models.InstrumentModel, error) {
+// GetInstrumentsByExchange gets instruments by exchange
+func (r *InstrumentRepository) GetInstrumentsByExchange(exchange string) ([]models.InstrumentModel, error) {
 	var instruments []models.InstrumentModel
-	err := r.DB.Model(&models.InstrumentModel{}).
-		Select("DISTINCT exchange, name").
-		Where("expiry = ?", expiry).
-		Find(&instruments).
-		Error
-	return instruments, err
+	if err := r.DB.Where("exchange = ?", exchange).Find(&instruments).Error; err != nil {
+		return nil, err
+	}
+	return instruments, nil
 }
 
 // GetInstrumentsByTradingsymbol gets instruments by tradingsymbol
@@ -174,24 +172,6 @@ func (r *InstrumentRepository) GetInstrumentsByExpiry(expiry string) ([]models.I
 	return instruments, nil
 }
 
-// GetInstrumentsByTokens gets instruments by tokens
-func (r *InstrumentRepository) GetInstrumentsByTokens(tokens []uint32) ([]models.InstrumentModel, error) {
-	var instruments []models.InstrumentModel
-	if err := r.DB.Where("instrument_token IN ?", tokens).Find(&instruments).Error; err != nil {
-		return nil, err
-	}
-	return instruments, nil
-}
-
-// GetInstrumentsByExchange gets instruments by exchange
-func (r *InstrumentRepository) GetInstrumentsByExchange(exchange string) ([]models.InstrumentModel, error) {
-	var instruments []models.InstrumentModel
-	if err := r.DB.Where("exchange = ?", exchange).Find(&instruments).Error; err != nil {
-		return nil, err
-	}
-	return instruments, nil
-}
-
 // GetInstrumentByExchangeTradingsymbol gets an instrument by exchange and tradingsymbol
 func (r *InstrumentRepository) GetInstrumentByExchangeTradingsymbol(exchange, tradingsymbol string) (models.InstrumentModel, error) {
 	var instrument models.InstrumentModel
@@ -206,38 +186,59 @@ func (r *InstrumentRepository) GetInstrumentByExchangeTradingsymbols(exchange st
 	return instruments, err
 }
 
-// GetOptionsExchangeNames returns a list of exchange:name for a given expiry
-func (r *InstrumentRepository) GetOptionsExchangeNames(expiry string) ([]models.InstrumentModel, error) {
+// GetInstrumentsByTokens returns instruments by tokens
+func (r *InstrumentRepository) GetInstrumentsByTokens(tokens []uint32) ([]models.InstrumentModel, error) {
+	var instruments []models.InstrumentModel
+	if err := r.DB.Where("instrument_token IN ?", tokens).Find(&instruments).Error; err != nil {
+		return nil, err
+	}
+	return instruments, nil
+}
+
+// GetFNOSegmentWiseName returns a list of segment wise name for a given expiry
+func (r *InstrumentRepository) GetFNOSegmentWiseName(expiry string) ([]models.InstrumentModel, error) {
 	var instruments []models.InstrumentModel
 	err := r.DB.Model(&models.InstrumentModel{}).
-		Select("DISTINCT exchange, name").
+		Select("DISTINCT segment, name").
 		Where("expiry = ?", expiry).
 		Find(&instruments).
 		Error
 	return instruments, err
 }
 
-// GetOptionChainInstruments returns a list of instruments for a given exchange, name and expiry
-func (r *InstrumentRepository) GetOptionChainInstruments(exchange, name, expiry string) ([]models.InstrumentModel, error) {
-	// get fut instruments
-	// var futInstruments []models.InstrumentModel
-	// instrumentType := "FUT"
-	// err := r.DB.Where("instrument_type = ? AND exchange = ? AND name = ? AND expiry >= ? ORDER BY expiry ASC LIMIT 1", instrumentType, exchange, name, expiry).Find(&futInstruments).Error
-	// if err != nil {
-	// 	return nil, err
-	// }
+// GetFNOSegmentWiseExpiry returns a list of segment wise expiry for a given name
+func (r *InstrumentRepository) GetFNOSegmentWiseExpiry(name string, limit, offset int) ([]models.InstrumentModel, error) {
+	var instruments []models.InstrumentModel
+	err := r.DB.Model(&models.InstrumentModel{}).
+		Select("DISTINCT segment, expiry").
+		Where("name = ? ", name).
+		Order("expiry ASC").
+		Limit(limit).
+		Offset(offset).
+		Find(&instruments).
+		Error
+	return instruments, err
+}
 
-	// get the opt instruments
-	var optInstruments []models.InstrumentModel
-	instrumentTypes := []string{"CE", "PE"}
-	err := r.DB.Where("instrument_type IN (?) AND exchange = ? AND name = ? AND expiry = ?", instrumentTypes, exchange, name, expiry).Find(&optInstruments).Error
+// GetFNOOptionChain returns the option chain for a given instrument
+func (r *InstrumentRepository) GetFNOOptionChain(exchange, name, futExpiry, optExpiry string) ([]models.InstrumentModel, error) {
+	// get fut instruments
+	var futInstruments []models.InstrumentModel
+	err := r.DB.Where("exchange = ? AND name = ? AND expiry = ? AND instrument_type = 'FUT' ORDER BY expiry ASC LIMIT 1", exchange, name, futExpiry).
+		Find(&futInstruments).
+		Error
 	if err != nil {
 		return nil, err
 	}
 
-	// append the instruments
-	// ocInstruments := append(futInstruments, optInstruments...)
+	// get opt instruments
+	var optInstruments []models.InstrumentModel
+	err = r.DB.Where("exchange = ? AND name = ? AND expiry = ? AND instrument_type IN ('CE', 'PE')", exchange, name, optExpiry).
+		Find(&optInstruments).
+		Error
+	if err != nil {
+		return nil, err
+	}
 
-	return optInstruments, nil
-
+	return append(futInstruments, optInstruments...), nil
 }
