@@ -153,7 +153,28 @@ func (cs *CronService) TickerStartJob() {
 	password := cs.cfg.KitetickerPassword
 	totpSecret := cs.cfg.KitetickerTotpSecret
 
-	sessionData, err := cs.sessionService.GenerateSession(userId, password, totpSecret)
+	// first delete the existing session
+	err := cs.sessionService.DeleteSession(userId)
+	if err != nil {
+		zaplogger.Error(jobName, zaplogger.Fields{
+			"step":  "DeleteSession",
+			"error": err.Error(),
+		})
+		return
+	}
+
+	// generate totp value
+	totpValue, err := cs.sessionService.GenerateTOTP(totpSecret)
+	if err != nil {
+		zaplogger.Error(jobName, zaplogger.Fields{
+			"step":  "GenerateTOTP",
+			"error": err.Error(),
+		})
+		return
+	}
+
+	// Generate a new session
+	sessionData, err := cs.sessionService.GenerateSession(userId, password, totpValue)
 	if err != nil {
 		zaplogger.Error(jobName, zaplogger.Fields{
 			"step":        "GenerateSession",
