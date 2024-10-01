@@ -51,3 +51,8 @@ func (r *SessionRepository) GetSessionByEnctoken(enctoken string) (*models.Sessi
 	}
 	return &session, nil
 }
+
+// DeleteSessionByUserId deletes a session by user ID
+func (r *SessionRepository) DeleteSessionByUserId(userId string) error {
+	return r.DB.Where("user_id = ?", userId).Delete(&models.SessionModel{}).Error
+}

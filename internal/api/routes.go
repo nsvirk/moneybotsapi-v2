@@ -17,7 +17,7 @@ import (
 )
 
 // SetupRoutes configures the routes for the API
-func SetupRoutes(e *echo.Echo, db *gorm.DB, redisClient *redis.Client) {
+func SetupRoutes(e *echo.Echo, cfg *config.Config, db *gorm.DB, redisClient *redis.Client) {
 
 	// Create a group for all API routes
 	api := e.Group("/api")
@@ -28,9 +28,14 @@ func SetupRoutes(e *echo.Echo, db *gorm.DB, redisClient *redis.Client) {
 	// Session routes (unprotected)
 	sessionService := service.NewSessionService(db)
 	sessionHandler := handlers.NewSessionHandler(sessionService)
-	sessionGroup := api.Group("/session")
-	sessionGroup.POST("/login", sessionHandler.GenerateSession)
-	sessionGroup.POST("/totp", sessionHandler.GenerateTOTP)
+	sessionOpenGroup := api.Group("/session")
+	sessionOpenGroup.POST("/token", sessionHandler.GenerateSession)
+	sessionOpenGroup.POST("/totp", sessionHandler.GenerateTOTP)
+
+	// Session routes (protected)
+	sessionProtectedGroup := api.Group("/session")
+	sessionProtectedGroup.Use(middleware.AuthMiddleware(db))
+	sessionProtectedGroup.POST("/delete", sessionHandler.DeleteSession)
 
 	// Instrument routes (protected)
 	instrumentHandler := handlers.NewInstrumentHandler(db)
@@ -81,6 +86,15 @@ func SetupRoutes(e *echo.Echo, db *gorm.DB, redisClient *redis.Client) {
 	streamGroup.Use(middleware.AuthMiddleware(db))
 	streamGroup.POST("/ticks", streamHandler.StreamTickerData)
 
+	// Cron routes (protected)
+	cronHandler := handlers.NewCronHandler(e, cfg, db, redisClient)
+	cronGroup := api.Group("/cron")
+	cronGroup.Use(middleware.AuthMiddleware(db))
+	cronGroup.PUT("/indices", cronHandler.UpdateIndices)
+	cronGroup.PUT("/instruments", cronHandler.UpdateInstruments)
+	cronGroup.PUT("/ticker_instruments", cronHandler.TickerInstrumentsUpdateJob)
+	// cronGroup.GET("/ticker_start", cronHandler.TickerStartJob)
+	// cronGroup.GET("/ticker_stop", cronHandler.TickerStopJob)
 }
 
 // indexRoute sets up the index route for the API

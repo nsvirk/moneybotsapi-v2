@@ -4,7 +4,6 @@ package service
 import (
 	"fmt"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/labstack/echo/v4"
@@ -57,20 +56,20 @@ func (cs *CronService) Start() {
 	// ------------------------------------------------------------
 	// Add your SCHEDULED jobs here
 	// ------------------------------------------------------------
-	cs.addScheduledJob("API Instruments UPDATE Job", cs.apiInstrumentsUpdateJob, "0 8 * * 1-5")      // Once at 08:00am, Mon-Fri
-	cs.addScheduledJob("API Indices UPDATE Job", cs.apiIndicesUpdateJob, "1 8 * * 1-5")              // Once at 08:01am, Mon-Fri
-	cs.addScheduledJob("TickerInstruments UPDATE Job", cs.tickerInstrumentsUpdateJob, "2 8 * * 1-5") // Once at 08:02am, Mon-Fri
-	cs.addScheduledJob("Ticker START Job", cs.tickerStartJob, "55 8	* * 1-5")                        // Once at 08:55am, Mon-Fri
-	cs.addScheduledJob("Ticker STOP Job", cs.tickerStopJob, "59 23 * * 1-5")                         // Once at 11:59pm, Mon-Fri
+	cs.addScheduledJob("API Instruments UPDATE Job", cs.ApiInstrumentsUpdateJob, "0 8 * * 1-5")      // Once at 08:00am, Mon-Fri
+	cs.addScheduledJob("API Indices UPDATE Job", cs.ApiIndicesUpdateJob, "1 8 * * 1-5")              // Once at 08:01am, Mon-Fri
+	cs.addScheduledJob("TickerInstruments UPDATE Job", cs.TickerInstrumentsUpdateJob, "2 8 * * 1-5") // Once at 08:02am, Mon-Fri
+	cs.addScheduledJob("Ticker START Job", cs.TickerStartJob, "55 8	* * 1-5")                        // Once at 08:55am, Mon-Fri
+	cs.addScheduledJob("Ticker STOP Job", cs.TickerStopJob, "59 23 * * 1-5")                         // Once at 11:59pm, Mon-Fri
 
 	// ------------------------------------------------------------
 	// Add your STARTUP jobs here
 	// ------------------------------------------------------------
-	cs.addStartupJob("API Instruments UPDATE Job", cs.apiInstrumentsUpdateJob, 1*time.Second)
-	cs.addStartupJob("API Indices UPDATE Job", cs.apiIndicesUpdateJob, 5*time.Second)
-	cs.addStartupJob("TickerInstruments UPDATE Job", cs.tickerInstrumentsUpdateJob, 19*time.Second)
-	cs.addStartupJob("TickerData TRUNCATE Job", cs.tickerDataTruncateJob, 25*time.Second)
-	cs.addStartupJob("Ticker START Job", cs.tickerStartJob, 28*time.Second)
+	cs.addStartupJob("API Instruments UPDATE Job", cs.ApiInstrumentsUpdateJob, 1*time.Second)
+	cs.addStartupJob("API Indices UPDATE Job", cs.ApiIndicesUpdateJob, 5*time.Second)
+	cs.addStartupJob("TickerInstruments UPDATE Job", cs.TickerInstrumentsUpdateJob, 19*time.Second)
+	cs.addStartupJob("TickerData TRUNCATE Job", cs.TickerDataTruncateJob, 25*time.Second)
+	cs.addStartupJob("Ticker START Job", cs.TickerStartJob, 28*time.Second)
 	// ------------------------------------------------------------
 
 	cs.c.Start()
@@ -115,8 +114,8 @@ func (cs *CronService) addScheduledJob(name string, job func(), schedule string)
 	})
 }
 
-// apiInstrumentsUpdateJob updates the instruments from the API
-func (cs *CronService) apiInstrumentsUpdateJob() {
+// ApiInstrumentsUpdateJob updates the instruments from the API
+func (cs *CronService) ApiInstrumentsUpdateJob() {
 	jobName := "API Instruments UPDATE Job "
 
 	rowsInserted, err := cs.instrumentService.UpdateInstruments()
@@ -131,7 +130,8 @@ func (cs *CronService) apiInstrumentsUpdateJob() {
 	})
 }
 
-func (cs *CronService) apiIndicesUpdateJob() {
+// ApiIndicesUpdateJob updates the indices from the APIx
+func (cs *CronService) ApiIndicesUpdateJob() {
 	jobName := "API Indices UPDATE Job "
 	rowsInserted, err := cs.indexService.UpdateIndices()
 	if err != nil {
@@ -145,8 +145,8 @@ func (cs *CronService) apiIndicesUpdateJob() {
 	})
 }
 
-// tickerStartJob starts the ticker
-func (cs *CronService) tickerStartJob() {
+// TickerStartJob starts the ticker
+func (cs *CronService) TickerStartJob() {
 	jobName := "Ticker START Job "
 	// Generate the session
 	userId := cs.cfg.KitetickerUserID
@@ -185,8 +185,8 @@ func (cs *CronService) tickerStartJob() {
 	})
 }
 
-// tickerStopJob stops the ticker
-func (cs *CronService) tickerStopJob() {
+// TickerStopJob stops the ticker
+func (cs *CronService) TickerStopJob() {
 	jobName := "Ticker STOP Job "
 	// Stop the ticker
 	userId := cs.cfg.KitetickerUserID
@@ -203,8 +203,8 @@ func (cs *CronService) tickerStopJob() {
 	})
 }
 
-// tickerDataTruncateJob truncates the ticker data
-func (cs *CronService) tickerDataTruncateJob() {
+// TickerDataTruncateJob truncates the ticker data
+func (cs *CronService) TickerDataTruncateJob() {
 	jobName := "TickerData TRUNCATE Job "
 	// Truncate the table
 	if err := cs.tickerService.TruncateTickerData(); err != nil {
@@ -215,8 +215,8 @@ func (cs *CronService) tickerDataTruncateJob() {
 	}
 }
 
-// tickerInstrumentsUpdateJob updates the ticker instruments
-func (cs *CronService) tickerInstrumentsUpdateJob() {
+// TickerInstrumentsUpdateJob updates the ticker instruments
+func (cs *CronService) TickerInstrumentsUpdateJob() {
 	jobName := "TickerInstruments UPDATE Job "
 	userId := cs.cfg.KitetickerUserID
 	var grandTotalInserted int64 = 0
@@ -239,21 +239,21 @@ func (cs *CronService) tickerInstrumentsUpdateJob() {
 	// Add Instruments
 	// -----------------------------------
 
-	// m0NFO, _, _ := cs.GetNFOFilterMonths()
+	// m0NFO, _, _ := getNFOFilterMonths()
 	// m0NFOFutFilter := "%" + m0NFO + "FUT"
 	// m0NFONiftyOptFilter := "NIFTY" + m0NFO + "%00_E"
 	// m0NFOBankNiftyOptFilter := "BANKNIFTY" + m0NFO + "%00_E"
 	// // m0NFOFinNiftyOptFilter := "FINNIFTY" + m0NFO + "%00_E"
 	// // m0NFOFinMidcapNiftyOptFilter := "MIDCPNIFTY" + m0NFO + "%00_E"
 
-	// _, m1NFO, _ := cs.GetNFOFilterMonths()
+	// _, m1NFO, _ := getNFOFilterMonths()
 	// m1NFOFutFilter := "%" + m1NFO + "FUT"
 	// m1NFONiftyOptFilter := "NIFTY" + m1NFO + "%00_E"
 	// m1NFOBankNiftyOptFilter := "BANKNIFTY" + m1NFO + "%00_E"
 	// // m1NFOFinNiftyOptFilter := "FINNIFTY" + m1NFO + "%00_E"
 	// // m1NFOFinMidcapNiftyOptFilter := "MIDCPNIFTY" + m1NFO + "%00_E"
 
-	// _, _, m2NFO := cs.GetNFOFilterMonths()
+	// _, _, m2NFO := getNFOFilterMonths()
 	// m2NFOFutFilter := "%" + m2NFO + "FUT"
 	// m2NFONiftyOptFilter := "NIFTY" + m2NFO + "%00_E"
 	// m2NFOBankNiftyOptFilter := "BANKNIFTY" + m2NFO + "%00_E"
@@ -397,11 +397,11 @@ func (cs *CronService) tickerInstrumentsUpdateJob() {
 	})
 }
 
-// GetNFOFilterMonths gets the NFO filter months
-func (cs *CronService) GetNFOFilterMonths() (string, string, string) {
-	now := time.Now()
-	month0 := strings.ToUpper(now.Format("06Jan"))
-	month1 := strings.ToUpper(now.AddDate(0, 1, 0).Format("06Jan"))
-	month2 := strings.ToUpper(now.AddDate(0, 2, 0).Format("06Jan"))
-	return month0, month1, month2
-}
+// // getNFOFilterMonths gets the NFO filter months
+// func getNFOFilterMonths() (string, string, string) {
+// 	now := time.Now()
+// 	month0 := strings.ToUpper(now.Format("06Jan"))
+// 	month1 := strings.ToUpper(now.AddDate(0, 1, 0).Format("06Jan"))
+// 	month2 := strings.ToUpper(now.AddDate(0, 2, 0).Format("06Jan"))
+// 	return month0, month1, month2
+// }

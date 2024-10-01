@@ -26,15 +26,6 @@ func NewSessionService(db *gorm.DB) *SessionService {
 
 // GenerateSession generates a new session for the given user
 func (s *SessionService) GenerateSession(userId, password, totpValue string) (models.SessionModel, error) {
-	if userId == "" {
-		return models.SessionModel{}, fmt.Errorf("`user_id` is required")
-	}
-	if password == "" {
-		return models.SessionModel{}, fmt.Errorf("`password` is required")
-	}
-	if totpValue == "" {
-		return models.SessionModel{}, fmt.Errorf("`totp_value` is required")
-	}
 
 	existingSession, err := s.repo.GetSessionByUserId(userId)
 	if err == nil {
@@ -77,24 +68,16 @@ func (s *SessionService) GenerateSession(userId, password, totpValue string) (mo
 
 // GenerateTOTP generates a TOTP value for the given secret
 func (s *SessionService) GenerateTOTP(totpSecret string) (string, error) {
-	if totpSecret == "" {
-		return "", fmt.Errorf("totp_secret is required")
-	}
-
 	return kitesession.GenerateTOTPValue(totpSecret)
 }
 
-// CheckSessionValid checks if the given enctoken is valid
-func (s *SessionService) CheckSessionValid(enctoken string) (bool, error) {
-	if enctoken == "" {
-		return false, fmt.Errorf("enctoken is required")
-	}
-
-	return s.kiteSession.CheckEnctokenValid(enctoken)
+// DeleteSession deletes the session for the given user
+func (s *SessionService) DeleteSession(userId string) error {
+	return s.repo.DeleteSessionByUserId(userId)
 }
 
-// Used by the AuthMiddleware to verify the session
 // VerifySession verifies the session for the given enctoken
+// Used by the AuthMiddleware to verify the session
 func (s *SessionService) VerifySession(enctoken string) (*models.SessionModel, error) {
 	session, err := s.repo.GetSessionByEnctoken(enctoken)
 	if err != nil {

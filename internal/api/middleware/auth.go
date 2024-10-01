@@ -71,12 +71,12 @@ func ExtractEnctokenFromAuthHeader(c echo.Context) (string, error) {
 	// header format is <enctoken <enctoken>>
 	auth := c.Request().Header.Get("Authorization")
 	if auth == "" {
-		return "", errors.New("missing Authorization header")
+		return "", errors.New("missing authorization header")
 	}
 	// Split the authorization header into two parts on space
 	partsToken := strings.SplitN(auth, " ", 2)
 	if len(partsToken) != 2 {
-		return "", errors.New("invalid Authorization header format")
+		return "", errors.New("invalid authorization header format")
 	}
 	enctoken := partsToken[1]
 

@@ -60,7 +60,7 @@ func main() {
 	middleware.SetupLoggerMiddleware(e)
 
 	// Setup routes
-	api.SetupRoutes(e, db, redisClient)
+	api.SetupRoutes(e, cfg, db, redisClient)
 
 	// Setup and start cron jobs
 	cronService := service.NewCronService(e, cfg, db, redisClient)
