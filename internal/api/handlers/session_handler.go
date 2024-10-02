@@ -104,12 +104,6 @@ func (h *SessionHandler) GenerateSession(c echo.Context) error {
 
 // GenerateTOTP generates a TOTP value for the given secret
 func (h *SessionHandler) GenerateTOTP(c echo.Context) error {
-
-	// get the user_id and totp_secret from the request
-	userid := c.FormValue("user_id")
-	if userid == "" {
-		return response.ErrorResponse(c, http.StatusBadRequest, "InputException", "`user_id` is required")
-	}
 	// get the totp_secret from the request
 	totpSecret := c.FormValue("totp_secret")
 	if totpSecret == "" {
@@ -122,7 +116,7 @@ func (h *SessionHandler) GenerateTOTP(c echo.Context) error {
 		return response.ErrorResponse(c, http.StatusBadRequest, "InputException", err.Error())
 	}
 
-	return response.SuccessResponse(c, map[string]string{"user_id": userid, "totp_value": totpValue})
+	return response.SuccessResponse(c, totpValue)
 }
 
 // DeleteSession deletes the session for the given user
