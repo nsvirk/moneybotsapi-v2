@@ -20,7 +20,7 @@ import (
 func SetupRoutes(e *echo.Echo, cfg *config.Config, db *gorm.DB, redisClient *redis.Client) {
 
 	// Create a group for all API routes
-	api := e.Group("/api")
+	api := e.Group("")
 
 	// Index route
 	api.GET("/", indexRoute)
