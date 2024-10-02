@@ -28,14 +28,10 @@ func SetupRoutes(e *echo.Echo, cfg *config.Config, db *gorm.DB, redisClient *red
 	// Session routes (unprotected)
 	sessionService := service.NewSessionService(db)
 	sessionHandler := handlers.NewSessionHandler(sessionService)
-	sessionOpenGroup := api.Group("/session")
-	sessionOpenGroup.POST("/token", sessionHandler.GenerateSession)
-	sessionOpenGroup.POST("/totp", sessionHandler.GenerateTOTP)
-
-	// Session routes (protected)
-	sessionProtectedGroup := api.Group("/session")
-	sessionProtectedGroup.Use(middleware.AuthMiddleware(db))
-	sessionProtectedGroup.POST("/delete", sessionHandler.DeleteSession)
+	sessionGroup := api.Group("/session")
+	sessionGroup.POST("/token", sessionHandler.GenerateSession)
+	sessionGroup.DELETE("/token", sessionHandler.DeleteSession)
+	sessionGroup.POST("/totp", sessionHandler.GenerateTOTP)
 
 	// Instrument routes (protected)
 	instrumentHandler := handlers.NewInstrumentHandler(db)

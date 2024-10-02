@@ -2,7 +2,9 @@
 package handlers
 
 import (
+	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/labstack/echo/v4"
@@ -43,7 +45,8 @@ func (h *SessionHandler) GenerateSession(c echo.Context) error {
 	if totpSecret != "" {
 		totpValueGenerated, err := h.service.GenerateTOTP(totpSecret)
 		if err != nil {
-			return response.ErrorResponse(c, http.StatusInternalServerError, "ServerException", err.Error())
+			// if unable to generate totp value, return unauthorized
+			return response.ErrorResponse(c, http.StatusUnauthorized, "AuthenticationException", err.Error())
 		}
 		totpValue = totpValueGenerated
 	}
@@ -116,7 +119,7 @@ func (h *SessionHandler) GenerateTOTP(c echo.Context) error {
 	// generate the totp value
 	totpValue, err := h.service.GenerateTOTP(totpSecret)
 	if err != nil {
-		return response.ErrorResponse(c, http.StatusInternalServerError, "ServerException", err.Error())
+		return response.ErrorResponse(c, http.StatusBadRequest, "InputException", err.Error())
 	}
 
 	return response.SuccessResponse(c, map[string]string{"user_id": userid, "totp_value": totpValue})
@@ -124,16 +127,26 @@ func (h *SessionHandler) GenerateTOTP(c echo.Context) error {
 
 // DeleteSession deletes the session for the given user
 func (h *SessionHandler) DeleteSession(c echo.Context) error {
-	// get the user_id from the request
-	userId := c.FormValue("user_id")
+	// get the user_id and enctoken from the request query params
+	rawQuery := c.QueryString()
+	userId, enctoken, err := extractQueryParams(rawQuery)
+	if err != nil {
+		return response.ErrorResponse(c, http.StatusBadRequest, "InputException", err.Error())
+	}
 	if userId == "" {
 		return response.ErrorResponse(c, http.StatusBadRequest, "InputException", "`user_id` is a required field")
 	}
+	if enctoken == "" {
+		return response.ErrorResponse(c, http.StatusBadRequest, "InputException", "`enctoken` is a required field")
+	}
 
 	// delete the session
-	err := h.service.DeleteSession(userId)
+	rowsAffected, err := h.service.DeleteSession(userId, enctoken)
 	if err != nil {
 		return response.ErrorResponse(c, http.StatusInternalServerError, "ServerException", err.Error())
+	}
+	if rowsAffected == 0 {
+		return response.ErrorResponse(c, http.StatusBadRequest, "InputException", "Session not found")
 	}
 	// Clear user_id cookie
 	c.SetCookie(&http.Cookie{
@@ -179,5 +192,31 @@ func (h *SessionHandler) DeleteSession(c echo.Context) error {
 		SameSite: http.SameSiteStrictMode,
 	})
 
-	return response.SuccessResponse(c, map[string]string{"user_id": userId})
+	return response.SuccessResponse(c, true)
+}
+
+func extractQueryParams(rawQuery string) (string, string, error) {
+	// Split the query string into key-value pairs
+	pairs := strings.Split(rawQuery, "&")
+	if len(pairs) != 2 {
+		return "", "", fmt.Errorf("invalid query string, required format `user_id=value&enctoken=value`")
+	}
+
+	var userId, enctoken string
+
+	for _, pair := range pairs {
+		parts := strings.SplitN(pair, "=", 2)
+
+		if len(parts) != 2 {
+			return "", "", fmt.Errorf("invalid query string, required format `user_id=value&enctoken=value`")
+		}
+		switch parts[0] {
+		case "user_id":
+			userId = parts[1]
+		case "enctoken":
+			enctoken = parts[1]
+		}
+	}
+
+	return userId, enctoken, nil
 }

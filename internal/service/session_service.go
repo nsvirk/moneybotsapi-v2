@@ -72,8 +72,8 @@ func (s *SessionService) GenerateTOTP(totpSecret string) (string, error) {
 }
 
 // DeleteSession deletes the session for the given user
-func (s *SessionService) DeleteSession(userId string) error {
-	return s.repo.DeleteSessionByUserId(userId)
+func (s *SessionService) DeleteSession(userId, enctoken string) (int64, error) {
+	return s.repo.DeleteSession(userId, enctoken)
 }
 
 // VerifySession verifies the session for the given enctoken
