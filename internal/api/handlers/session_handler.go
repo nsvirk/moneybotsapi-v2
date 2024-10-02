@@ -2,9 +2,8 @@
 package handlers
 
 import (
-	"fmt"
 	"net/http"
-	"strings"
+	"net/url"
 	"time"
 
 	"github.com/labstack/echo/v4"
@@ -122,8 +121,9 @@ func (h *SessionHandler) GenerateTOTP(c echo.Context) error {
 // DeleteSession deletes the session for the given user
 func (h *SessionHandler) DeleteSession(c echo.Context) error {
 	// get the user_id and enctoken from the request query params
-	rawQuery := c.QueryString()
-	userId, enctoken, err := extractQueryParams(rawQuery)
+	userId := c.QueryParam("user_id")
+	enctokenUrlEncoded := c.QueryParam("enctoken")
+	enctoken, err := url.QueryUnescape(enctokenUrlEncoded)
 	if err != nil {
 		return response.ErrorResponse(c, http.StatusBadRequest, "InputException", err.Error())
 	}
@@ -187,30 +187,4 @@ func (h *SessionHandler) DeleteSession(c echo.Context) error {
 	})
 
 	return response.SuccessResponse(c, true)
-}
-
-func extractQueryParams(rawQuery string) (string, string, error) {
-	// Split the query string into key-value pairs
-	pairs := strings.Split(rawQuery, "&")
-	if len(pairs) != 2 {
-		return "", "", fmt.Errorf("invalid query string, required format `user_id=value&enctoken=value`")
-	}
-
-	var userId, enctoken string
-
-	for _, pair := range pairs {
-		parts := strings.SplitN(pair, "=", 2)
-
-		if len(parts) != 2 {
-			return "", "", fmt.Errorf("invalid query string, required format `user_id=value&enctoken=value`")
-		}
-		switch parts[0] {
-		case "user_id":
-			userId = parts[1]
-		case "enctoken":
-			enctoken = parts[1]
-		}
-	}
-
-	return userId, enctoken, nil
 }

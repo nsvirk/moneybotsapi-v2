@@ -1,0 +1,34 @@
+name: Deploy to EC2
+
+on:
+  push:
+    branches: [main] # Adjust this to your main branch name if different
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Set up Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: 1.22.5 # Adjust this to your Go version
+
+      - name: Build
+        run: go build -v ./...
+
+      - name: Deploy to EC2
+        env:
+          PRIVATE_KEY: ${{ secrets.MONEYBOTS_EC2_SSH_PRIVATE_KEY }}
+          HOST: moneybots.app
+          USER: ec2-user # Adjust this to your EC2 user
+        run: |
+          echo "$PRIVATE_KEY" > private_key && chmod 600 private_key
+          scp -i private_key -o StrictHostKeyChecking=no -r ./* ${USER}@${HOST}:/home/ec2-user/apps/moneybotsapi
+          ssh -i private_key -o StrictHostKeyChecking=no ${USER}@${HOST} '
+            cd /home/ec2-user/apps/moneybotsapi &&
+            make deploy
+          '
+          rm -f private_key
