@@ -33,6 +33,30 @@ jobs:
           else
             echo "Key format is not recognized"
           fi
+          echo "Checking for common issues:"
+          if echo "$PRIVATE_KEY" | grep -q "\\\\n"; then
+            echo "Warning: Key contains '\\n' sequences, which may cause issues"
+          fi
+          if echo "$PRIVATE_KEY" | grep -q "^[[:space:]]"; then
+            echo "Warning: Key contains leading whitespace"
+          fi
+          if echo "$PRIVATE_KEY" | grep -q "[[:space:]]$"; then
+            echo "Warning: Key contains trailing whitespace"
+          fi
+
+      - name: Attempt SSH Connection
+        env:
+          PRIVATE_KEY: ${{ secrets.MONEYBOTS_EC2_SSH_PRIVATE_KEY }}
+          HOST: moneybots.app
+          USER: ec2-user
+        run: |
+          echo "$PRIVATE_KEY" > private_key
+          chmod 600 private_key
+          echo "Private key file contents (first line and length):"
+          head -n 1 private_key
+          wc -l private_key
+          ssh -v -i private_key -o StrictHostKeyChecking=no -o ConnectTimeout=10 ${USER}@${HOST} 'echo "Connection successful"' || echo "Connection failed"
+          rm -f private_key
 
       - name: Deploy to EC2
         env:
