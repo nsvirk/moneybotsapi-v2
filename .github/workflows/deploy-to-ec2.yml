@@ -11,7 +11,24 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
-      - name: Debug SSH key
+      - name: Check Secrets Availability
+        run: |
+          echo "Checking for MONEYBOTS_EC2_SSH_PRIVATE_KEY:"
+          if [ -n "${{ secrets.MONEYBOTS_EC2_SSH_PRIVATE_KEY }}" ]; then
+            echo "MONEYBOTS_EC2_SSH_PRIVATE_KEY is set"
+          else
+            echo "MONEYBOTS_EC2_SSH_PRIVATE_KEY is not set"
+          fi
+
+          echo "Checking for GITHUB_TOKEN (should always be available):"
+          if [ -n "${{ secrets.GITHUB_TOKEN }}" ]; then
+            echo "GITHUB_TOKEN is set"
+          else
+            echo "GITHUB_TOKEN is not set (this is unexpected)"
+          fi
+
+      - name: Debug SSH key (if available)
+        if: ${{ secrets.MONEYBOTS_EC2_SSH_PRIVATE_KEY }}
         env:
           PRIVATE_KEY: ${{ secrets.MONEYBOTS_EC2_SSH_PRIVATE_KEY }}
         run: |
@@ -20,56 +37,16 @@ jobs:
             echo "The PRIVATE_KEY is empty"
           else
             echo "The PRIVATE_KEY is not empty"
-          fi
-          echo "Number of lines in the key:"
-          echo "$PRIVATE_KEY" | wc -l
-          echo "First few characters of the key (should start with '-----BEGIN'):"
-          echo "$PRIVATE_KEY" | head -c 20
-          echo "Key format check:"
-          if echo "$PRIVATE_KEY" | grep -q "BEGIN OPENSSH PRIVATE KEY"; then
-            echo "Key appears to be in OpenSSH format"
-          elif echo "$PRIVATE_KEY" | grep -q "BEGIN RSA PRIVATE KEY"; then
-            echo "Key appears to be in RSA format"
-          else
-            echo "Key format is not recognized"
-          fi
-          echo "Checking for common issues:"
-          if echo "$PRIVATE_KEY" | grep -q "\\\\n"; then
-            echo "Warning: Key contains '\\n' sequences, which may cause issues"
-          fi
-          if echo "$PRIVATE_KEY" | grep -q "^[[:space:]]"; then
-            echo "Warning: Key contains leading whitespace"
-          fi
-          if echo "$PRIVATE_KEY" | grep -q "[[:space:]]$"; then
-            echo "Warning: Key contains trailing whitespace"
+            echo "Number of lines in the key:"
+            echo "$PRIVATE_KEY" | wc -l
+            echo "First few characters of the key (should start with '-----BEGIN'):"
+            echo "$PRIVATE_KEY" | head -c 20
           fi
 
-      - name: Attempt SSH Connection
-        env:
-          PRIVATE_KEY: ${{ secrets.MONEYBOTS_EC2_SSH_PRIVATE_KEY }}
-          HOST: moneybots.app
-          USER: ec2-user
+      - name: Echo Workflow Context
         run: |
-          echo "$PRIVATE_KEY" > private_key
-          chmod 600 private_key
-          echo "Private key file contents (first line and length):"
-          head -n 1 private_key
-          wc -l private_key
-          ssh -v -i private_key -o StrictHostKeyChecking=no -o ConnectTimeout=10 ${USER}@${HOST} 'echo "Connection successful"' || echo "Connection failed"
-          rm -f private_key
-
-      - name: Deploy to EC2
-        env:
-          PRIVATE_KEY: ${{ secrets.MONEYBOTS_EC2_SSH_PRIVATE_KEY }}
-          HOST: moneybots.app
-          USER: ec2-user
-          APP_PATH: /home/ec2-user/apps/moneybotsapi
-        run: |
-          echo "$PRIVATE_KEY" > private_key
-          chmod 600 private_key
-          ssh -i private_key -o StrictHostKeyChecking=no -o ConnectTimeout=10 ${USER}@${HOST} '
-            echo "Connection successful"
-            cd ${{ env.APP_PATH }} &&
-            make deploy
-          ' || echo "Deployment failed"
-          rm -f private_key
+          echo "GitHub Workflow Context:"
+          echo "  Event Name: ${{ github.event_name }}"
+          echo "  Repository: ${{ github.repository }}"
+          echo "  Ref: ${{ github.ref }}"
+          echo "  SHA: ${{ github.sha }}"
