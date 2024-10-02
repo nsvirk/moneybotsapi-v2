@@ -15,10 +15,16 @@ jobs:
         env:
           PRIVATE_KEY: ${{ secrets.MONEYBOTS_EC2_SSH_PRIVATE_KEY }}
         run: |
-          echo "First line of the key:"
-          echo "$PRIVATE_KEY" | head -n 1
+          echo "Key content check:"
+          if [ -z "$PRIVATE_KEY" ]; then
+            echo "The PRIVATE_KEY is empty"
+          else
+            echo "The PRIVATE_KEY is not empty"
+          fi
           echo "Number of lines in the key:"
           echo "$PRIVATE_KEY" | wc -l
+          echo "First few characters of the key (should start with '-----BEGIN'):"
+          echo "$PRIVATE_KEY" | head -c 20
           echo "Key format check:"
           if echo "$PRIVATE_KEY" | grep -q "BEGIN OPENSSH PRIVATE KEY"; then
             echo "Key appears to be in OpenSSH format"
