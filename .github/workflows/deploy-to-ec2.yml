@@ -11,36 +11,27 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
-      - name: Check Secrets Availability
-        run: |
-          echo "Checking for MONEYBOTS_EC2_SSH_PRIVATE_KEY:"
-          if [ -n "${{ secrets.MONEYBOTS_EC2_SSH_PRIVATE_KEY }}" ]; then
-            echo "MONEYBOTS_EC2_SSH_PRIVATE_KEY is set"
-          else
-            echo "MONEYBOTS_EC2_SSH_PRIVATE_KEY is not set"
-          fi
-
-          echo "Checking for GITHUB_TOKEN (should always be available):"
-          if [ -n "${{ secrets.GITHUB_TOKEN }}" ]; then
-            echo "GITHUB_TOKEN is set"
-          else
-            echo "GITHUB_TOKEN is not set (this is unexpected)"
-          fi
-
-      - name: Debug SSH key (if available)
-        if: ${{ secrets.MONEYBOTS_EC2_SSH_PRIVATE_KEY }}
+      - name: Check Secrets and Debug SSH key
         env:
           PRIVATE_KEY: ${{ secrets.MONEYBOTS_EC2_SSH_PRIVATE_KEY }}
         run: |
-          echo "Key content check:"
-          if [ -z "$PRIVATE_KEY" ]; then
-            echo "The PRIVATE_KEY is empty"
-          else
-            echo "The PRIVATE_KEY is not empty"
+          echo "Checking for MONEYBOTS_EC2_SSH_PRIVATE_KEY:"
+          if [ -n "$PRIVATE_KEY" ]; then
+            echo "MONEYBOTS_EC2_SSH_PRIVATE_KEY is set"
             echo "Number of lines in the key:"
             echo "$PRIVATE_KEY" | wc -l
             echo "First few characters of the key (should start with '-----BEGIN'):"
             echo "$PRIVATE_KEY" | head -c 20
+            echo "Key format check:"
+            if echo "$PRIVATE_KEY" | grep -q "BEGIN OPENSSH PRIVATE KEY"; then
+              echo "Key appears to be in OpenSSH format"
+            elif echo "$PRIVATE_KEY" | grep -q "BEGIN RSA PRIVATE KEY"; then
+              echo "Key appears to be in RSA format"
+            else
+              echo "Key format is not recognized"
+            fi
+          else
+            echo "MONEYBOTS_EC2_SSH_PRIVATE_KEY is not set or empty"
           fi
 
       - name: Echo Workflow Context
@@ -50,3 +41,20 @@ jobs:
           echo "  Repository: ${{ github.repository }}"
           echo "  Ref: ${{ github.ref }}"
           echo "  SHA: ${{ github.sha }}"
+
+      - name: Deploy to EC2
+        if: ${{ success() && env.PRIVATE_KEY != '' }}
+        env:
+          PRIVATE_KEY: ${{ secrets.MONEYBOTS_EC2_SSH_PRIVATE_KEY }}
+          HOST: moneybots.app
+          USER: ec2-user
+          APP_PATH: /home/ec2-user/apps/moneybotsapi
+        run: |
+          echo "$PRIVATE_KEY" > private_key
+          chmod 600 private_key
+          ssh -i private_key -o StrictHostKeyChecking=no -o ConnectTimeout=10 ${USER}@${HOST} '
+            echo "Connection successful"
+            cd ${{ env.APP_PATH }} &&
+            make deploy
+          ' || echo "Deployment failed"
+          rm -f private_key
