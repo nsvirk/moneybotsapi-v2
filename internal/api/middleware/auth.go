@@ -44,6 +44,23 @@ func AuthMiddleware(db *gorm.DB) echo.MiddlewareFunc {
 	}
 }
 
+// ExtractEnctokenFromAuthHeader extracts the enctoken from the authorization header
+func ExtractEnctokenFromAuthHeader(c echo.Context) (string, error) {
+	// header format is <enctoken <enctoken>>
+	auth := c.Request().Header.Get("Authorization")
+	if auth == "" {
+		return "", errors.New("missing authorization header")
+	}
+	// Split the authorization header into two parts on space
+	partsToken := strings.SplitN(auth, " ", 2)
+	if len(partsToken) != 2 {
+		return "", errors.New("invalid authorization header format")
+	}
+	enctoken := partsToken[1]
+
+	return enctoken, nil
+}
+
 // GetUserIdEnctokenFromEchoContext gets the userId and enctoken from the echo context
 func GetUserIdEnctokenFromEchoContext(c echo.Context) (string, string, error) {
 	userId, ok := c.Get("user_id").(string)
@@ -65,51 +82,3 @@ func GetUserSessionFromEchoContext(c echo.Context) (*models.SessionModel, error)
 	}
 	return userSession, nil
 }
-
-// ExtractEnctokenFromAuthHeader extracts the enctoken from the authorization header
-func ExtractEnctokenFromAuthHeader(c echo.Context) (string, error) {
-	// header format is <enctoken <enctoken>>
-	auth := c.Request().Header.Get("Authorization")
-	if auth == "" {
-		return "", errors.New("missing authorization header")
-	}
-	// Split the authorization header into two parts on space
-	partsToken := strings.SplitN(auth, " ", 2)
-	if len(partsToken) != 2 {
-		return "", errors.New("invalid authorization header format")
-	}
-	enctoken := partsToken[1]
-
-	return enctoken, nil
-
-}
-
-// // ExtractUserIdEnctokenFromAuthHeader gets the userId and enctoken from the authorization header
-// func ExtractUserIdEnctokenFromAuthHeader(c echo.Context) (string, string, error) {
-// 	// header format is <token user_id:enctoken>
-// 	auth := c.Request().Header.Get("Authorization")
-// 	if auth == "" {
-// 		return "", "", errors.New("missing Authorization header")
-// 	}
-// 	// Split the authorization header into two parts on space
-// 	partsToken := strings.SplitN(auth, " ", 2)
-// 	if len(partsToken) != 2 {
-// 		return "", "", errors.New("invalid Authorization header format")
-// 	}
-// 	token := partsToken[0]
-// 	userCredentials := partsToken[1]
-
-// 	if token != "token" {
-// 		return "", "", errors.New("invalid Authorization header format")
-// 	}
-
-// 	// Split the user credentials part futher into two parts on colon
-// 	partsUser := strings.SplitN(userCredentials, ":", 2)
-// 	if len(partsUser) != 2 {
-// 		return "", "", errors.New("invalid Authorization header format")
-// 	}
-// 	userId := partsUser[0]
-// 	enctoken := partsUser[1]
-
-// 	return userId, enctoken, nil
-// }

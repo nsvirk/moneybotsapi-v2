@@ -1,4 +1,4 @@
-name: Deploy to EC2
+name: Deploy Moneybots API Service to EC2
 
 on:
   push:
@@ -16,7 +16,7 @@ jobs:
           PRIVATE_KEY: ${{ secrets.MONEYBOTS_EC2_SSH_PRIVATE_KEY }}
           HOST: moneybots.app
           USER: ec2-user
-          APP_PATH: /home/ec2-user/apps/moneybotsapi
+          APP_PATH: /home/ec2-user/apps/api/moneybotsapi
         run: |
           echo "$PRIVATE_KEY" > private_key
           chmod 600 private_key
