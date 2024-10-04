@@ -43,20 +43,44 @@ func (r *IndexRepository) GetIndicesRecordCount() (int64, error) {
 	return count, nil
 }
 
-// GetAllIndexNames gets the names of all indices
-func (r *IndexRepository) GetAllIndexNames() ([]string, error) {
-	var indices []string
+// GetAllIndicesNames gets the names of all indices
+func (r *IndexRepository) GetAllIndicesNames() ([]models.IndexModel, error) {
+	var indices []models.IndexModel
 	err := r.DB.Table(models.IndexTableName).
-		Select("DISTINCT index").
+		Select("DISTINCT exchange, index").
 		Find(&indices).Error
 	if err != nil {
-		return nil, fmt.Errorf("failed to fetch index names: %v", err)
+		return nil, fmt.Errorf("failed to fetch distinct indices: %v", err)
 	}
 	return indices, nil
 }
 
-// GetIndexNames gets the names of all indices for a given exchange
-func (r *IndexRepository) GetIndexNames(exchange string) ([]string, error) {
+// GetAllDistinctIndexSymbol gets all distinct indices
+func (r *IndexRepository) GetAllDistinctIndexSymbol() ([]models.IndexModel, error) {
+	var indices []models.IndexModel
+	err := r.DB.Table(models.IndexTableName).
+		Select("DISTINCT exchange, tradingsymbol").
+		Find(&indices).Error
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch distinct indices: %v", err)
+	}
+	return indices, nil
+}
+
+// GetIndices gets the names of all indices for a given exchange
+func (r *IndexRepository) GetIndices(exchange string) ([]models.IndexModel, error) {
+	var indices []models.IndexModel
+	err := r.DB.Table(models.IndexTableName).
+		Where("exchange = ?", exchange).
+		Find(&indices).Error
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch indices: %v", err)
+	}
+	return indices, nil
+}
+
+// GetIndicesNames gets the names of all indices for a given exchange
+func (r *IndexRepository) GetIndicesNames(exchange string) ([]string, error) {
 	var indices []string
 	err := r.DB.Table(models.IndexTableName).
 		Select("DISTINCT index").
@@ -69,12 +93,13 @@ func (r *IndexRepository) GetIndexNames(exchange string) ([]string, error) {
 }
 
 // GetIndexInstruments fetches the instruments for a given index
-func (r *IndexRepository) GetIndexInstruments(indexName string) ([]models.IndexModel, error) {
+func (r *IndexRepository) GetIndexInstruments(exchange, index string) ([]models.IndexModel, error) {
 	var indexInstruments []models.IndexModel
-	err := r.DB.Where("index = ?", indexName).
+	err := r.DB.Where("index = ?", index).
+		Where("exchange = ?", exchange).
 		Find(&indexInstruments).Error
 	if err != nil {
-		return nil, fmt.Errorf("failed to fetch `%s` index instruments: %v", indexName, err)
+		return nil, fmt.Errorf("failed to fetch `%s` `%s` instruments: %v", exchange, index, err)
 	}
 
 	return indexInstruments, nil

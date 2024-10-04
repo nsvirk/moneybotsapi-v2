@@ -325,7 +325,7 @@ func (cs *CronService) TickerInstrumentsUpdateJob() {
 	// -----------------------------------
 	// Add All Indices
 	// -----------------------------------
-	indices, err := cs.indexService.GetAllIndexNames()
+	indices, err := cs.indexService.repo.GetAllDistinctIndexSymbol()
 	if err != nil {
 		zaplogger.Error(jobName, zaplogger.Fields{
 			"step":  "GetIndexNames",
@@ -333,12 +333,13 @@ func (cs *CronService) TickerInstrumentsUpdateJob() {
 		})
 		return
 	}
-
 	var idxCount int64 = 0
 	var idxQueried, idxInserted, idxUpdated, idxTotal int64 = 0, 0, 0, 0
-	for _, indexName := range indices {
+	for _, index := range indices {
+		exchange := index.Exchange
+		indexName := index.Index
 
-		indexInstruments, err := cs.indexService.GetIndexInstruments(indexName)
+		indexInstruments, err := cs.indexService.GetIndexInstruments(exchange, indexName)
 		if err != nil {
 			zaplogger.Error(jobName, zaplogger.Fields{
 				"step":  "GetNSEIndexInstruments",

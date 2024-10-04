@@ -12,21 +12,21 @@ import (
 	"gorm.io/gorm"
 )
 
-// UpdateIndicesResponseData is the response data for the UpdateIndices endpoint
-type UpdateIndicesResponseData struct {
+// UpdateIndexResponseData is the response data for the UpdateIndex endpoint
+type UpdateIndexResponseData struct {
 	Timestamp string `json:"timestamp"`
 	Records   int    `json:"records"`
 }
 
-// IndicesHandler is the handler for the indices
-type IndicesHandler struct {
+// IndexHandler is the handler for the indices
+type IndexHandler struct {
 	DB                *gorm.DB
 	InstrumentService *service.InstrumentService
 	IndexService      *service.IndexService
 }
 
-func NewIndicesHandler(db *gorm.DB) *IndicesHandler {
-	return &IndicesHandler{
+func NewIndexHandler(db *gorm.DB) *IndexHandler {
+	return &IndexHandler{
 		DB:                db,
 		InstrumentService: service.NewInstrumentService(db),
 		IndexService:      service.NewIndexService(db),
@@ -34,13 +34,13 @@ func NewIndicesHandler(db *gorm.DB) *IndicesHandler {
 }
 
 // UpdateIndices updates the indices in the database
-func (h *IndicesHandler) UpdateIndices(c echo.Context) error {
+func (h *IndexHandler) UpdateIndices(c echo.Context) error {
 	totalInserted, err := h.IndexService.UpdateIndices()
 	if err != nil {
 		return response.ErrorResponse(c, http.StatusInternalServerError, "ServerException", err.Error())
 	}
 
-	responseData := UpdateIndicesResponseData{
+	responseData := UpdateIndexResponseData{
 		Timestamp: time.Now().Format("2006-01-02 15:04:05"),
 		Records:   int(totalInserted),
 	}
@@ -48,14 +48,40 @@ func (h *IndicesHandler) UpdateIndices(c echo.Context) error {
 	return response.SuccessResponse(c, responseData)
 }
 
-// GetIndexNames returns a list of index names for a given exchange
-func (h *IndicesHandler) GetIndexNames(c echo.Context) error {
+// GetAllIndicesNames returns a list of all indices names
+func (h *IndexHandler) GetAllIndicesNames(c echo.Context) error {
+	indices, err := h.IndexService.GetAllIndicesNames()
+	if err != nil {
+		return response.ErrorResponse(c, http.StatusInternalServerError, "ServerException", err.Error())
+	}
+	result := make(map[string][]string, len(indices))
+	for _, index := range indices {
+		result[index.Exchange] = append(result[index.Exchange], index.Index)
+	}
+	return response.SuccessResponse(c, result)
+}
+
+// GetIndices returns a list of indices for a given exchange
+func (h *IndexHandler) GetIndices(c echo.Context) error {
+	exchange := c.Param("exchange")
+	if exchange == "" {
+		return response.ErrorResponse(c, http.StatusBadRequest, "InputException", "`exchange` is required")
+	}
+	indices, err := h.IndexService.GetIndices(exchange)
+	if err != nil {
+		return response.ErrorResponse(c, http.StatusInternalServerError, "ServerException", err.Error())
+	}
+	return response.SuccessResponse(c, indices)
+}
+
+// GetIndicesNames returns a list of index names for a given exchange
+func (h *IndexHandler) GetIndicesNames(c echo.Context) error {
 	exchange := c.Param("exchange")
 	if exchange == "" {
 		return response.ErrorResponse(c, http.StatusBadRequest, "InputException", "`exchange` is required")
 	}
 
-	indices, err := h.IndexService.GetIndexNames(exchange)
+	indices, err := h.IndexService.GetIndicesNames(exchange)
 	if err != nil {
 		return response.ErrorResponse(c, http.StatusInternalServerError, "ServerException", err.Error())
 	}
@@ -63,12 +89,16 @@ func (h *IndicesHandler) GetIndexNames(c echo.Context) error {
 }
 
 // GetIndexTokens returns a list of tokens for a given index name
-func (h *IndicesHandler) GetIndexTokens(c echo.Context) error {
+func (h *IndexHandler) GetIndexTokens(c echo.Context) error {
+	exchange := c.Param("exchange")
 	index := c.Param("index")
+	if exchange == "" {
+		return response.ErrorResponse(c, http.StatusBadRequest, "InputException", "`exchange` is required")
+	}
 	if index == "" {
 		return response.ErrorResponse(c, http.StatusBadRequest, "InputException", "`index` is required")
 	}
-	instruments, err := h.IndexService.GetIndexInstruments(index)
+	instruments, err := h.IndexService.GetIndexInstruments(exchange, index)
 	if err != nil {
 		return response.ErrorResponse(c, http.StatusInternalServerError, "ServerException", fmt.Sprintf("Error getting instruments for index %s: %v", index, err))
 	}
@@ -80,12 +110,16 @@ func (h *IndicesHandler) GetIndexTokens(c echo.Context) error {
 }
 
 // GetIndexSymbols returns a list of symbols for a given index name
-func (h *IndicesHandler) GetIndexSymbols(c echo.Context) error {
+func (h *IndexHandler) GetIndexSymbols(c echo.Context) error {
+	exchange := c.Param("exchange")
 	index := c.Param("index")
+	if exchange == "" {
+		return response.ErrorResponse(c, http.StatusBadRequest, "InputException", "`exchange` is required")
+	}
 	if index == "" {
 		return response.ErrorResponse(c, http.StatusBadRequest, "InputException", "`index` is required")
 	}
-	instruments, err := h.IndexService.GetIndexInstruments(index)
+	instruments, err := h.IndexService.GetIndexInstruments(exchange, index)
 	if err != nil {
 		return response.ErrorResponse(c, http.StatusInternalServerError, "ServerException", fmt.Sprintf("Error getting instruments for index %s: %v", index, err))
 	}
@@ -97,12 +131,16 @@ func (h *IndicesHandler) GetIndexSymbols(c echo.Context) error {
 }
 
 // GetIndexInstruments returns a list of instruments for a given list of index names
-func (h *IndicesHandler) GetIndexInstruments(c echo.Context) error {
+func (h *IndexHandler) GetIndexInstruments(c echo.Context) error {
+	exchange := c.Param("exchange")
 	index := c.Param("index")
+	if exchange == "" {
+		return response.ErrorResponse(c, http.StatusBadRequest, "InputException", "`exchange` is required")
+	}
 	if index == "" {
 		return response.ErrorResponse(c, http.StatusBadRequest, "InputException", "`index` is required")
 	}
-	instruments, err := h.IndexService.GetIndexInstruments(index)
+	instruments, err := h.IndexService.GetIndexInstruments(exchange, index)
 	if err != nil {
 		return response.ErrorResponse(c, http.StatusInternalServerError, "ServerException", fmt.Sprintf("Error fetching instruments for index %s: %v", index, err))
 	}

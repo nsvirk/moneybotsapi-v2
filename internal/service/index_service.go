@@ -19,26 +19,26 @@ import (
 var nseIndicesBaseURL = "https://raw.githubusercontent.com/nsvirk/nseindicesdata/refs/heads/main/csvfiles/"
 
 var nseIndicesFileMap = map[string]string{
-	"NSE:NIFTY 50":                 "ind_nifty50list.csv",
-	"NSE:NIFTY NEXT 50":            "ind_niftynext50list.csv",
-	"NSE:NIFTY 100":                "ind_nifty100list.csv",
-	"NSE:NIFTY 200":                "ind_nifty200list.csv",
-	"NSE:NIFTY TOTAL MARKET":       "ind_niftytotalmarket_list.csv",
-	"NSE:NIFTY 500":                "ind_nifty500list.csv",
-	"NSE:NIFTY MIDCAP 50":          "ind_niftymidcap50list.csv",
-	"NSE:NIFTY MIDCAP 100":         "ind_niftymidcap100list.csv",
-	"NSE:NIFTY SMALLCAP 100":       "ind_niftysmallcap100list.csv",
-	"NSE:NIFTY AUTO":               "ind_niftyautolist.csv",
-	"NSE:NIFTY BANK":               "ind_niftybanklist.csv",
-	"NSE:NIFTY FINANCIAL SERVICES": "ind_niftyfinancelist.csv",
-	"NSE:NIFTY HEALTHCARE":         "ind_niftyhealthcarelist.csv",
-	"NSE:NIFTY IT":                 "ind_niftyitlist.csv",
-	"NSE:NIFTY FMCG":               "ind_niftyfmcglist.csv",
-	"NSE:NIFTY METAL":              "ind_niftymetallist.csv",
-	"NSE:NIFTY PHARMA":             "ind_niftypharmalist.csv",
-	"NSE:NIFTY REALTY":             "ind_niftyrealtylist.csv",
-	"NSE:NIFTY CONSUMER DURABLES":  "ind_niftyconsumerdurableslist.csv",
-	"NSE:NIFTY OIL GAS":            "ind_niftyoilgaslist.csv",
+	"NIFTY 50":                 "ind_nifty50list.csv",
+	"NIFTY NEXT 50":            "ind_niftynext50list.csv",
+	"NIFTY 100":                "ind_nifty100list.csv",
+	"NIFTY 200":                "ind_nifty200list.csv",
+	"NIFTY TOTAL MARKET":       "ind_niftytotalmarket_list.csv",
+	"NIFTY 500":                "ind_nifty500list.csv",
+	"NIFTY MIDCAP 50":          "ind_niftymidcap50list.csv",
+	"NIFTY MIDCAP 100":         "ind_niftymidcap100list.csv",
+	"NIFTY SMALLCAP 100":       "ind_niftysmallcap100list.csv",
+	"NIFTY AUTO":               "ind_niftyautolist.csv",
+	"NIFTY BANK":               "ind_niftybanklist.csv",
+	"NIFTY FINANCIAL SERVICES": "ind_niftyfinancelist.csv",
+	"NIFTY HEALTHCARE":         "ind_niftyhealthcarelist.csv",
+	"NIFTY IT":                 "ind_niftyitlist.csv",
+	"NIFTY FMCG":               "ind_niftyfmcglist.csv",
+	"NIFTY METAL":              "ind_niftymetallist.csv",
+	"NIFTY PHARMA":             "ind_niftypharmalist.csv",
+	"NIFTY REALTY":             "ind_niftyrealtylist.csv",
+	"NIFTY CONSUMER DURABLES":  "ind_niftyconsumerdurableslist.csv",
+	"NIFTY OIL GAS":            "ind_niftyoilgaslist.csv",
 }
 
 var nseIndicesUpdatedAtKey = "NSE_INDICES_UPDATED_AT"
@@ -66,28 +66,31 @@ func NewIndexService(db *gorm.DB) *IndexService {
 	}
 }
 
-// GetAllIndexNames returns the names of all indices
-func (s *IndexService) GetAllIndexNames() ([]string, error) {
-	return s.repo.GetAllIndexNames()
+// GetAllIndicesNames returns the names of all indices
+func (s *IndexService) GetAllIndicesNames() ([]models.IndexModel, error) {
+	return s.repo.GetAllIndicesNames()
 }
 
-// GetIndexNames returns the names of all indices for a given exchange
-func (s *IndexService) GetIndexNames(exchange string) ([]string, error) {
-	return s.repo.GetIndexNames(exchange)
+// GetIndices returns the names of all indices for a given exchange
+func (s *IndexService) GetIndices(exchange string) ([]models.IndexModel, error) {
+	return s.repo.GetIndices(exchange)
+}
+
+// GetIndicesNames returns the names of all indices for a given exchange
+func (s *IndexService) GetIndicesNames(exchange string) ([]string, error) {
+	return s.repo.GetIndicesNames(exchange)
 }
 
 // GetIndexInstruments returns the instruments for a given index
-func (s *IndexService) GetIndexInstruments(indexName string) ([]models.InstrumentModel, error) {
-	indexRecords, err := s.repo.GetIndexInstruments(indexName)
+func (s *IndexService) GetIndexInstruments(exchange, index string) ([]models.InstrumentModel, error) {
+	indexRecords, err := s.repo.GetIndexInstruments(exchange, index)
 	if err != nil {
 		return nil, err
 	}
 
 	// get instruments from index repo
-	var exchange string
 	indexTradingsymbols := make([]string, len(indexRecords))
 	for i, indexRecord := range indexRecords {
-		exchange = indexRecord.Exchange
 		indexTradingsymbols[i] = indexRecord.Tradingsymbol
 	}
 
@@ -198,15 +201,15 @@ func (s *IndexService) isUpdateIndicesRequired(lastUpdatedAt string) bool {
 }
 
 // fetchNSEIndexInstruments fetches the instruments for a given NSE index
-func (s *IndexService) fetchNSEIndexInstruments(indexName string) ([]models.IndexModel, error) {
+func (s *IndexService) fetchNSEIndexInstruments(index string) ([]models.IndexModel, error) {
 
 	// -------------------------------------------------------------------------------------------------
 	// make request to index url
 	// -------------------------------------------------------------------------------------------------
 	// get index csv file name
-	indexCsvFile, ok := nseIndicesFileMap[indexName]
+	indexCsvFile, ok := nseIndicesFileMap[index]
 	if !ok {
-		return nil, fmt.Errorf("invalid index: %s", indexName)
+		return nil, fmt.Errorf("invalid index: %s", index)
 	}
 
 	// make url
@@ -215,7 +218,7 @@ func (s *IndexService) fetchNSEIndexInstruments(indexName string) ([]models.Inde
 	// create request
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create request for index %s: %v", indexName, err)
+		return nil, fmt.Errorf("failed to create request for index %s: %v", index, err)
 	}
 
 	// set headers
@@ -227,14 +230,14 @@ func (s *IndexService) fetchNSEIndexInstruments(indexName string) ([]models.Inde
 	// make request
 	resp, err := s.client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("failed to download CSV for index %s: %v", indexName, err)
+		return nil, fmt.Errorf("failed to download CSV for index %s: %v", index, err)
 	}
 	defer resp.Body.Close()
 
 	reader := csv.NewReader(resp.Body)
 	records, err := reader.ReadAll()
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse CSV for index %s: %v", indexName, err)
+		return nil, fmt.Errorf("failed to parse CSV for index %s: %v", index, err)
 	}
 
 	indexRecords := make([]models.IndexModel, 0, len(records)-1)
@@ -244,7 +247,7 @@ func (s *IndexService) fetchNSEIndexInstruments(indexName string) ([]models.Inde
 			continue
 		}
 		indexRecords = append(indexRecords, models.IndexModel{
-			Index:         indexName,
+			Index:         index,
 			Exchange:      "NSE",
 			CompanyName:   record[0],
 			Industry:      record[1],
