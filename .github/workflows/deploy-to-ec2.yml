@@ -23,6 +23,6 @@ jobs:
           ssh -i private_key -o StrictHostKeyChecking=no -o ConnectTimeout=10 ${USER}@${HOST} '
             echo "Connection successful"
             cd ${{ env.APP_PATH }} &&
-            make deploy
+            sudo -E make deploy
           ' || echo "Deployment failed"
           rm -f private_key
