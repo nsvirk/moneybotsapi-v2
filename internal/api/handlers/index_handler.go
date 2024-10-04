@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/labstack/echo/v4"
+	"github.com/nsvirk/moneybotsapi/internal/models"
 	"github.com/nsvirk/moneybotsapi/internal/service"
 	"github.com/nsvirk/moneybotsapi/pkg/utils/response"
 	"gorm.io/gorm"
@@ -48,15 +49,15 @@ func (h *IndexHandler) UpdateIndices(c echo.Context) error {
 	return response.SuccessResponse(c, responseData)
 }
 
-// GetAllIndicesNames returns a list of all indices names
-func (h *IndexHandler) GetAllIndicesNames(c echo.Context) error {
-	indices, err := h.IndexService.GetAllIndicesNames()
+// GetAllIndices returns a list of all indices
+func (h *IndexHandler) GetAllIndices(c echo.Context) error {
+	indices, err := h.IndexService.GetAllIndices()
 	if err != nil {
 		return response.ErrorResponse(c, http.StatusInternalServerError, "ServerException", err.Error())
 	}
-	result := make(map[string][]string, len(indices))
+	result := make(map[string][]models.IndexModel, len(indices))
 	for _, index := range indices {
-		result[index.Exchange] = append(result[index.Exchange], index.Index)
+		result[index.Exchange] = append(result[index.Exchange], index)
 	}
 	return response.SuccessResponse(c, result)
 }
@@ -74,14 +75,14 @@ func (h *IndexHandler) GetIndices(c echo.Context) error {
 	return response.SuccessResponse(c, indices)
 }
 
-// GetIndicesNames returns a list of index names for a given exchange
-func (h *IndexHandler) GetIndicesNames(c echo.Context) error {
+// GetIndexNames returns a list of index names for a given exchange
+func (h *IndexHandler) GetIndexNames(c echo.Context) error {
 	exchange := c.Param("exchange")
 	if exchange == "" {
 		return response.ErrorResponse(c, http.StatusBadRequest, "InputException", "`exchange` is required")
 	}
 
-	indices, err := h.IndexService.GetIndicesNames(exchange)
+	indices, err := h.IndexService.GetIndexNames(exchange)
 	if err != nil {
 		return response.ErrorResponse(c, http.StatusInternalServerError, "ServerException", err.Error())
 	}

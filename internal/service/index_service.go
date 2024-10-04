@@ -66,9 +66,9 @@ func NewIndexService(db *gorm.DB) *IndexService {
 	}
 }
 
-// GetAllIndicesNames returns the names of all indices
-func (s *IndexService) GetAllIndicesNames() ([]models.IndexModel, error) {
-	return s.repo.GetAllIndicesNames()
+// GetAllIndices returns all indices
+func (s *IndexService) GetAllIndices() ([]models.IndexModel, error) {
+	return s.repo.GetAllIndices()
 }
 
 // GetIndices returns the names of all indices for a given exchange
@@ -76,9 +76,9 @@ func (s *IndexService) GetIndices(exchange string) ([]models.IndexModel, error) 
 	return s.repo.GetIndices(exchange)
 }
 
-// GetIndicesNames returns the names of all indices for a given exchange
-func (s *IndexService) GetIndicesNames(exchange string) ([]string, error) {
-	return s.repo.GetIndicesNames(exchange)
+// GetIndexNames returns the names of all indices for a given exchange
+func (s *IndexService) GetIndexNames(exchange string) ([]string, error) {
+	return s.repo.GetIndexNames(exchange)
 }
 
 // GetIndexInstruments returns the instruments for a given index

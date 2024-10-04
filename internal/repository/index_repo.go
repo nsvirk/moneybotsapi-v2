@@ -43,26 +43,13 @@ func (r *IndexRepository) GetIndicesRecordCount() (int64, error) {
 	return count, nil
 }
 
-// GetAllIndicesNames gets the names of all indices
-func (r *IndexRepository) GetAllIndicesNames() ([]models.IndexModel, error) {
+// GetAllIndices gets all indices
+func (r *IndexRepository) GetAllIndices() ([]models.IndexModel, error) {
 	var indices []models.IndexModel
 	err := r.DB.Table(models.IndexTableName).
-		Select("DISTINCT exchange, index").
 		Find(&indices).Error
 	if err != nil {
-		return nil, fmt.Errorf("failed to fetch distinct indices: %v", err)
-	}
-	return indices, nil
-}
-
-// GetAllDistinctIndexSymbol gets all distinct indices
-func (r *IndexRepository) GetAllDistinctIndexSymbol() ([]models.IndexModel, error) {
-	var indices []models.IndexModel
-	err := r.DB.Table(models.IndexTableName).
-		Select("DISTINCT exchange, tradingsymbol").
-		Find(&indices).Error
-	if err != nil {
-		return nil, fmt.Errorf("failed to fetch distinct indices: %v", err)
+		return nil, fmt.Errorf("failed to get all indices: %v", err)
 	}
 	return indices, nil
 }
@@ -74,20 +61,20 @@ func (r *IndexRepository) GetIndices(exchange string) ([]models.IndexModel, erro
 		Where("exchange = ?", exchange).
 		Find(&indices).Error
 	if err != nil {
-		return nil, fmt.Errorf("failed to fetch indices: %v", err)
+		return nil, fmt.Errorf("failed to get indices: %v", err)
 	}
 	return indices, nil
 }
 
-// GetIndicesNames gets the names of all indices for a given exchange
-func (r *IndexRepository) GetIndicesNames(exchange string) ([]string, error) {
+// GetIndexNames gets the names of all indices for a given exchange
+func (r *IndexRepository) GetIndexNames(exchange string) ([]string, error) {
 	var indices []string
 	err := r.DB.Table(models.IndexTableName).
 		Select("DISTINCT index").
 		Where("exchange = ?", exchange).
 		Find(&indices).Error
 	if err != nil {
-		return nil, fmt.Errorf("failed to fetch `%s` index names: %v", exchange, err)
+		return nil, fmt.Errorf("failed to get `%s` index names: %v", exchange, err)
 	}
 	return indices, nil
 }
@@ -99,8 +86,21 @@ func (r *IndexRepository) GetIndexInstruments(exchange, index string) ([]models.
 		Where("exchange = ?", exchange).
 		Find(&indexInstruments).Error
 	if err != nil {
-		return nil, fmt.Errorf("failed to fetch `%s` `%s` instruments: %v", exchange, index, err)
+		return nil, fmt.Errorf("failed to get `%s` `%s` instruments: %v", exchange, index, err)
 	}
 
 	return indexInstruments, nil
+}
+
+// GetAllDistinctIndexSymbol gets all distinct indices
+// Used by cron
+func (r *IndexRepository) GetAllDistinctIndexSymbol() ([]models.IndexModel, error) {
+	var indices []models.IndexModel
+	err := r.DB.Table(models.IndexTableName).
+		Select("DISTINCT exchange, tradingsymbol").
+		Find(&indices).Error
+	if err != nil {
+		return nil, fmt.Errorf("failed to get all distinct indices: %v", err)
+	}
+	return indices, nil
 }
