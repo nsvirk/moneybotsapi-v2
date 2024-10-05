@@ -49,7 +49,7 @@ func SetupRoutes(e *echo.Echo, cfg *config.Config, db *gorm.DB, redisClient *red
 	indexHandler := handlers.NewIndexHandler(db)
 	indexGroup := api.Group("/indices")
 	indexGroup.Use(middleware.AuthMiddleware(db))
-	indexGroup.GET("", indexHandler.GetAllIndices)
+	indexGroup.GET("/all", indexHandler.GetAllIndices)
 	indexGroup.GET("/:exchange", indexHandler.GetIndices)
 	indexGroup.GET("/:exchange/:index/names", indexHandler.GetIndexNames)
 	indexGroup.GET("/:exchange/:index/tokens", indexHandler.GetIndexTokens)
