@@ -132,13 +132,8 @@ func (s *InstrumentService) isUpdateInstrumentsRequired(lastUpdatedAt string) bo
 	return true
 }
 
-// GetInstrumentsByTokens returns instruments for tokens
-func (s *InstrumentService) GetInstrumentsByTokens(tokens []uint32) ([]models.InstrumentModel, error) {
-	return s.repo.GetInstrumentsByTokens(tokens)
-}
-
-// GetInstrumentsBySymbols returns instruments for symbols
-func (s *InstrumentService) GetInstrumentsBySymbols(symbols []string) ([]models.InstrumentModel, error) {
+// GetInstrumentsInfoBySymbols returns instruments info for symbols
+func (s *InstrumentService) GetInstrumentsInfoBySymbols(symbols []string) ([]models.InstrumentModel, error) {
 	instrumentsResponse := make([]models.InstrumentModel, 0, len(symbols))
 	for _, symbol := range symbols {
 		parts := strings.Split(strings.TrimSpace(symbol), ":")
@@ -161,9 +156,14 @@ func (s *InstrumentService) GetInstrumentsBySymbols(symbols []string) ([]models.
 	return instrumentsResponse, nil
 }
 
+// GetInstrumentsInfoByTokens returns instruments info for tokens
+func (s *InstrumentService) GetInstrumentsInfoByTokens(tokens []uint32) ([]models.InstrumentModel, error) {
+	return s.repo.GetInstrumentsByTokens(tokens)
+}
+
 // QueryInstruments queries the instruments table
-func (s *InstrumentService) QueryInstruments(queryInstrumentsParams models.QueryInstrumentsParams) ([]models.InstrumentModel, error) {
-	return s.repo.QueryInstruments(queryInstrumentsParams)
+func (s *InstrumentService) GetInstrumentsQuery(queryInstrumentsParams models.QueryInstrumentsParams) ([]models.InstrumentModel, error) {
+	return s.repo.GetInstrumentsQuery(queryInstrumentsParams)
 }
 
 // GetInstrumentsByExchange queries the instruments table by exchange and returns a list of instruments

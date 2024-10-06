@@ -38,8 +38,8 @@ func SetupRoutes(e *echo.Echo, cfg *config.Config, db *gorm.DB, redisClient *red
 	instrumentGroup := api.Group("/instruments")
 	instrumentGroup.Use(middleware.AuthMiddleware(db))
 	// instrument routes
-	instrumentGroup.GET("/info", instrumentHandler.GetInstrumentsBySymbolsOrTokens)
-	instrumentGroup.GET("/query", instrumentHandler.GetInstrumentsByQuery)
+	instrumentGroup.GET("/info", instrumentHandler.GetInstrumentsInfo)
+	instrumentGroup.GET("/query", instrumentHandler.GetInstrumentsQuery)
 	// instrument fno routes
 	instrumentGroup.GET("/fno/segment_expiries/:name", instrumentHandler.GetFNOSegmentWiseExpiry)
 	instrumentGroup.GET("/fno/segment_names/:expiry", instrumentHandler.GetFNOSegmentWiseName)

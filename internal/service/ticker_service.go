@@ -341,7 +341,7 @@ func (s *TickerService) TruncateTickerData() error {
 func (s *TickerService) AddTickerInstruments(userID string, instrumentsStr []string) (map[string]interface{}, error) {
 
 	// get instruments using instrument service
-	instruments, err := s.instrumentService.GetInstrumentsBySymbols(instrumentsStr)
+	instruments, err := s.instrumentService.GetInstrumentsInfoBySymbols(instrumentsStr)
 	if err != nil {
 		return nil, err
 	}
@@ -412,7 +412,7 @@ func (s *TickerService) UpsertQueriedInstruments(userID, exchange, tradingsymbol
 		Segment:        segment,
 		InstrumentType: instrumentType,
 	}
-	queriedInstruments, err := s.instrumentService.QueryInstruments(queryInstrumentsParams)
+	queriedInstruments, err := s.instrumentService.GetInstrumentsQuery(queryInstrumentsParams)
 	if err != nil {
 		return result, err
 	}

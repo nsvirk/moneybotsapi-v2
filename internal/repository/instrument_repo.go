@@ -83,8 +83,8 @@ func (r *InstrumentRepository) GetInstrumentsRecordCount() (int64, error) {
 	return count, nil
 }
 
-// QueryInstruments queries the instruments table
-func (r *InstrumentRepository) QueryInstruments(qip models.QueryInstrumentsParams) ([]models.InstrumentModel, error) {
+// GetInstrumentsQuery queries the instruments table
+func (r *InstrumentRepository) GetInstrumentsQuery(qip models.QueryInstrumentsParams) ([]models.InstrumentModel, error) {
 
 	query := r.DB.Model(&models.InstrumentModel{})
 
@@ -224,16 +224,18 @@ func (r *InstrumentRepository) GetFNOSegmentWiseExpiry(name string, limit, offse
 func (r *InstrumentRepository) GetFNOOptionChain(exchange, name, futExpiry, optExpiry string) ([]models.InstrumentModel, error) {
 	// get fut instruments
 	var futInstruments []models.InstrumentModel
-	err := r.DB.Where("exchange = ? AND name = ? AND expiry = ? AND instrument_type = 'FUT' ORDER BY expiry ASC LIMIT 1", exchange, name, futExpiry).
-		Find(&futInstruments).
-		Error
-	if err != nil {
-		return nil, err
+	if len(futExpiry) > 0 {
+		err := r.DB.Where("exchange = ? AND name = ? AND expiry = ? AND instrument_type = 'FUT' ORDER BY expiry ASC LIMIT 1", exchange, name, futExpiry).
+			Find(&futInstruments).
+			Error
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	// get opt instruments
 	var optInstruments []models.InstrumentModel
-	err = r.DB.Where("exchange = ? AND name = ? AND expiry = ? AND instrument_type IN ('CE', 'PE')", exchange, name, optExpiry).
+	err := r.DB.Where("exchange = ? AND name = ? AND expiry = ? AND instrument_type IN ('CE', 'PE')", exchange, name, optExpiry).
 		Find(&optInstruments).
 		Error
 	if err != nil {

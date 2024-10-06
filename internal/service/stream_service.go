@@ -217,7 +217,7 @@ func (s *StreamService) cleanupGlobalTokenMap() {
 
 // prepareTokenMap prepares the token map for the given instruments
 func (s *StreamService) prepareTokenMap(instrumentsStr []string) (map[uint32]string, error) {
-	instruments, err := s.instrumentService.GetInstrumentsBySymbols(instrumentsStr)
+	instruments, err := s.instrumentService.GetInstrumentsInfoBySymbols(instrumentsStr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get instrument token: %w", err)
 	}
