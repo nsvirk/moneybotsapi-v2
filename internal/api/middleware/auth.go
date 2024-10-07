@@ -17,14 +17,14 @@ func AuthMiddleware(db *gorm.DB) echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
 			// Get the userId and enctoken from the authorization header
-			enctoken, err := ExtractEnctokenFromAuthHeader(c)
+			userID, enctoken, err := ExtractUserIDEnctokenFromAuthHeader(c)
 			if err != nil {
 				return response.ErrorResponse(c, http.StatusUnauthorized, "AuthorizationException", err.Error())
 			}
 
 			// Verify the session
 			sessionService := service.NewSessionService(db)
-			userSession, err := sessionService.VerifySessionForAuthorization(enctoken)
+			userSession, err := sessionService.VerifyUserAuthorization(userID, enctoken)
 			if err != nil {
 				return response.ErrorResponse(c, http.StatusUnauthorized, "AuthorizationException", err.Error())
 			}
@@ -44,21 +44,22 @@ func AuthMiddleware(db *gorm.DB) echo.MiddlewareFunc {
 	}
 }
 
-// ExtractEnctokenFromAuthHeader extracts the enctoken from the authorization header
-func ExtractEnctokenFromAuthHeader(c echo.Context) (string, error) {
-	// header format is <enctoken <enctoken>>
+// ExtractUserIDEnctokenFromAuthHeader extracts the userID and enctoken from the authorization header
+func ExtractUserIDEnctokenFromAuthHeader(c echo.Context) (string, string, error) {
+	// header format is <user_id:enctoken>
 	auth := c.Request().Header.Get("Authorization")
 	if auth == "" {
-		return "", errors.New("missing authorization header")
+		return "", "", errors.New("missing authorization header")
 	}
-	// Split the authorization header into two parts on space
-	partsToken := strings.SplitN(auth, " ", 2)
+	// Split the authorization header into two parts on colon
+	partsToken := strings.SplitN(auth, ":", 2)
 	if len(partsToken) != 2 {
-		return "", errors.New("invalid authorization header format")
+		return "", "", errors.New("invalid authorization header format")
 	}
+	userID := partsToken[0]
 	enctoken := partsToken[1]
 
-	return enctoken, nil
+	return userID, enctoken, nil
 }
 
 // GetUserIdEnctokenFromEchoContext gets the userId and enctoken from the echo context

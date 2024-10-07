@@ -85,16 +85,25 @@ func (s *SessionService) CheckEnctokenValid(enctoken string) (bool, error) {
 // VerifySessionForAuthorization verifies the session for the given enctoken
 // If valid also returns the session details
 // Used by the AuthMiddleware to verify the session
-func (s *SessionService) VerifySessionForAuthorization(enctoken string) (*models.SessionModel, error) {
-	session, err := s.repo.GetSessionByEnctoken(enctoken)
-	if err != nil {
-		return nil, err
-	}
-
+func (s *SessionService) VerifyUserAuthorization(userID, enctoken string) (*models.SessionModel, error) {
 	// Verify if the session is still valid with KiteConnect API
 	isValid, err := s.kiteSession.CheckEnctokenValid(enctoken)
 	if err != nil || !isValid {
-		return nil, fmt.Errorf("expired or invalid session")
+		return nil, err
+	}
+
+	// Get the session from the database
+	session, err := s.repo.GetSessionByUserId(userID)
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil, fmt.Errorf("`user_id` %s not found", userID)
+		}
+		return nil, err
+	}
+
+	// Compare the enctoken from database with the enctoken from the request
+	if enctoken != session.Enctoken {
+		return nil, fmt.Errorf("`enctoken` is invalid for `user_id` %s", userID)
 	}
 
 	return session, nil
