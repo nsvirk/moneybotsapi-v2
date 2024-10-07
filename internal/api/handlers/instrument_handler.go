@@ -187,8 +187,8 @@ func (h *InstrumentHandler) GetFNOOptionChain(c echo.Context) error {
 // GetFNOSegmentWiseName returns a list of segment wise name for a given expiry
 func (h *InstrumentHandler) GetFNOSegmentWiseName(c echo.Context) error {
 	expiry := c.Param("expiry")
-	if len(expiry) == 0 {
-		return response.ErrorResponse(c, http.StatusBadRequest, "InputException", "No `expiry` provided")
+	if len(expiry) == 0 || expiry == ":expiry" {
+		return response.ErrorResponse(c, http.StatusBadRequest, "InputException", "`expiry` is required")
 	}
 
 	// check if expiry is valid date
@@ -220,6 +220,10 @@ func (h *InstrumentHandler) GetFNOSegmentWiseExpiry(c echo.Context) error {
 	name := c.Param("name")
 	var limit int = 20
 	var offset int = 0
+
+	if len(name) == 0 || name == ":name" {
+		return response.ErrorResponse(c, http.StatusBadRequest, "InputException", "`name` is required")
+	}
 
 	instruments, err := h.InstrumentService.GetFNOSegmentWiseExpiry(name, limit, offset)
 	if err != nil {

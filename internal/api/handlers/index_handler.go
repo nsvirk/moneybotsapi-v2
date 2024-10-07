@@ -63,7 +63,7 @@ func (h *IndexHandler) GetAllIndices(c echo.Context) error {
 // GetIndicesByExchange returns a list of indices for a given exchange
 func (h *IndexHandler) GetIndicesByExchange(c echo.Context) error {
 	exchange := c.Param("exchange")
-	if exchange == "" {
+	if exchange == "" || exchange == ":exchange" {
 		return response.ErrorResponse(c, http.StatusBadRequest, "InputException", "`exchange` is required")
 	}
 	indices, err := h.IndexService.GetIndicesByExchange(exchange)
@@ -77,10 +77,10 @@ func (h *IndexHandler) GetIndicesByExchange(c echo.Context) error {
 func (h *IndexHandler) GetIndexInstruments(c echo.Context) error {
 	exchange := c.Param("exchange")
 	index := c.Param("index")
-	if exchange == "" {
+	if exchange == "" || exchange == ":exchange" {
 		return response.ErrorResponse(c, http.StatusBadRequest, "InputException", "`exchange` is required")
 	}
-	if index == "" {
+	if index == "" || index == ":index" {
 		return response.ErrorResponse(c, http.StatusBadRequest, "InputException", "`index` is required")
 	}
 	instruments, err := h.IndexService.GetIndexInstruments(exchange, index)
