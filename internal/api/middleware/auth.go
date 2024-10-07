@@ -24,7 +24,7 @@ func AuthMiddleware(db *gorm.DB) echo.MiddlewareFunc {
 
 			// Verify the session
 			sessionService := service.NewSessionService(db)
-			userSession, err := sessionService.VerifySession(enctoken)
+			userSession, err := sessionService.VerifySessionForAuthorization(enctoken)
 			if err != nil {
 				return response.ErrorResponse(c, http.StatusUnauthorized, "AuthorizationException", err.Error())
 			}

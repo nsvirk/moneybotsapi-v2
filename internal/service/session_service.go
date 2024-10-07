@@ -76,9 +76,16 @@ func (s *SessionService) DeleteSession(userId, enctoken string) (int64, error) {
 	return s.repo.DeleteSession(userId, enctoken)
 }
 
-// VerifySession verifies the session for the given enctoken
+// CheckEnctokenValid checks if the enctoken is valid
+// Checks from KiteConnect API
+func (s *SessionService) CheckEnctokenValid(enctoken string) (bool, error) {
+	return s.kiteSession.CheckEnctokenValid(enctoken)
+}
+
+// VerifySessionForAuthorization verifies the session for the given enctoken
+// If valid also returns the session details
 // Used by the AuthMiddleware to verify the session
-func (s *SessionService) VerifySession(enctoken string) (*models.SessionModel, error) {
+func (s *SessionService) VerifySessionForAuthorization(enctoken string) (*models.SessionModel, error) {
 	session, err := s.repo.GetSessionByEnctoken(enctoken)
 	if err != nil {
 		return nil, err

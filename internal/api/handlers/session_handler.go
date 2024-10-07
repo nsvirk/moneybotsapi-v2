@@ -188,3 +188,18 @@ func (h *SessionHandler) DeleteSession(c echo.Context) error {
 
 	return response.SuccessResponse(c, true)
 }
+
+// CheckEnctokenValid checks if the enctoken is valid
+func (h *SessionHandler) CheckEnctokenValid(c echo.Context) error {
+	// get the enctoken from the request form body
+	enctoken := c.FormValue("enctoken")
+	if enctoken == "" {
+		return response.ErrorResponse(c, http.StatusBadRequest, "InputException", "`enctoken` is required")
+	}
+	// check if the enctoken is valid
+	enctokenValid, err := h.service.CheckEnctokenValid(enctoken)
+	if err != nil {
+		return response.ErrorResponse(c, http.StatusInternalServerError, "ServerException", err.Error())
+	}
+	return response.SuccessResponse(c, enctokenValid)
+}

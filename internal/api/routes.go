@@ -32,6 +32,7 @@ func SetupRoutes(e *echo.Echo, cfg *config.Config, db *gorm.DB, redisClient *red
 	sessionGroup.POST("/token", sessionHandler.GenerateSession)
 	sessionGroup.DELETE("/token", sessionHandler.DeleteSession)
 	sessionGroup.POST("/totp", sessionHandler.GenerateTOTP)
+	sessionGroup.POST("/valid", sessionHandler.CheckEnctokenValid)
 
 	// Instrument routes (protected)
 	instrumentHandler := handlers.NewInstrumentHandler(db)
