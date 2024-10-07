@@ -51,8 +51,8 @@ func SetupRoutes(e *echo.Echo, cfg *config.Config, db *gorm.DB, redisClient *red
 	indexGroup := api.Group("/indices")
 	indexGroup.Use(middleware.AuthMiddleware(db))
 	indexGroup.GET("/all", indexHandler.GetAllIndices)
-	indexGroup.GET("/:exchange", indexHandler.GetIndicesByExchange)
-	indexGroup.GET("/:exchange/:index", indexHandler.GetIndexInstruments)
+	indexGroup.GET("/:exchange/info", indexHandler.GetIndicesByExchange)
+	indexGroup.GET("/:exchange/:index/instruments", indexHandler.GetIndexInstruments)
 
 	// Ticker routes (protected)
 	tickerService := service.NewTickerService(db, redisClient)
