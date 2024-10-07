@@ -54,27 +54,14 @@ func (r *IndexRepository) GetAllIndices() ([]models.IndexModel, error) {
 	return indices, nil
 }
 
-// GetIndices gets the names of all indices for a given exchange
-func (r *IndexRepository) GetIndices(exchange string) ([]models.IndexModel, error) {
+// GetIndicesByExchange gets the names of all indices for a given exchange
+func (r *IndexRepository) GetIndicesByExchange(exchange string) ([]models.IndexModel, error) {
 	var indices []models.IndexModel
 	err := r.DB.Table(models.IndexTableName).
 		Where("exchange = ?", exchange).
 		Find(&indices).Error
 	if err != nil {
 		return nil, fmt.Errorf("failed to get indices: %v", err)
-	}
-	return indices, nil
-}
-
-// GetIndexNames gets the names of all indices for a given exchange
-func (r *IndexRepository) GetIndexNames(exchange string) ([]string, error) {
-	var indices []string
-	err := r.DB.Table(models.IndexTableName).
-		Select("DISTINCT index").
-		Where("exchange = ?", exchange).
-		Find(&indices).Error
-	if err != nil {
-		return nil, fmt.Errorf("failed to get `%s` index names: %v", exchange, err)
 	}
 	return indices, nil
 }

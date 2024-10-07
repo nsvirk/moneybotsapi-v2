@@ -138,7 +138,7 @@ func (s *InstrumentService) GetInstrumentsInfoBySymbols(symbols []string) ([]mod
 	for _, symbol := range symbols {
 		parts := strings.Split(strings.TrimSpace(symbol), ":")
 		if len(parts) != 2 {
-			return nil, fmt.Errorf("invalid instrument format: %s", symbols)
+			return nil, fmt.Errorf("invalid input: %s", symbol)
 		}
 		exchange := strings.TrimSpace(parts[0])
 		tradingsymbol := strings.TrimSpace(parts[1])

@@ -71,14 +71,9 @@ func (s *IndexService) GetAllIndices() ([]models.IndexModel, error) {
 	return s.repo.GetAllIndices()
 }
 
-// GetIndices returns the names of all indices for a given exchange
-func (s *IndexService) GetIndices(exchange string) ([]models.IndexModel, error) {
-	return s.repo.GetIndices(exchange)
-}
-
-// GetIndexNames returns the names of all indices for a given exchange
-func (s *IndexService) GetIndexNames(exchange string) ([]string, error) {
-	return s.repo.GetIndexNames(exchange)
+// GetIndicesByExchange returns the names of all indices for a given exchange
+func (s *IndexService) GetIndicesByExchange(exchange string) ([]models.IndexModel, error) {
+	return s.repo.GetIndicesByExchange(exchange)
 }
 
 // GetIndexInstruments returns the instruments for a given index
@@ -87,19 +82,16 @@ func (s *IndexService) GetIndexInstruments(exchange, index string) ([]models.Ins
 	if err != nil {
 		return nil, err
 	}
-
 	// get instruments from index repo
 	indexTradingsymbols := make([]string, len(indexRecords))
 	for i, indexRecord := range indexRecords {
 		indexTradingsymbols[i] = indexRecord.Tradingsymbol
 	}
-
 	// get instruments from instrument repo
 	instruments, err := s.instrumentRepo.GetInstrumentByExchangeTradingsymbols(exchange, indexTradingsymbols)
 	if err != nil {
 		return nil, err
 	}
-
 	return instruments, nil
 }
 

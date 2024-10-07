@@ -79,7 +79,7 @@ func (h *InstrumentHandler) GetInstrumentsInfo(c echo.Context) error {
 		for _, tokenStr := range tokensStr {
 			token, err := strconv.ParseUint(tokenStr, 10, 32)
 			if err != nil {
-				return response.ErrorResponse(c, http.StatusBadRequest, "InputException", "Invalid `instrument_token` format, must be digits")
+				return response.ErrorResponse(c, http.StatusBadRequest, "InputException", "Invalid `instrument_token`, must be digits")
 			}
 			tokens = append(tokens, uint32(token))
 		}
