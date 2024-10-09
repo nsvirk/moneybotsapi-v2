@@ -143,47 +143,6 @@ func (h *InstrumentHandler) GetInstrumentsQuery(c echo.Context) error {
 	return response.SuccessResponse(c, instruments)
 }
 
-// GetFNOOptionChain returns the option chain for a given instrument token
-func (h *InstrumentHandler) GetFNOOptionChain(c echo.Context) error {
-	exchange := c.QueryParam("exchange")
-	name := c.QueryParam("name")
-	optExpiry := c.QueryParam("opt_expiry")
-	futExpiry := c.QueryParam("fut_expiry")
-
-	if len(exchange) == 0 {
-		return response.ErrorResponse(c, http.StatusBadRequest, "InputException", "`exchange` is required")
-	}
-	if len(name) == 0 {
-		return response.ErrorResponse(c, http.StatusBadRequest, "InputException", "`name` is required")
-	}
-	if len(optExpiry) == 0 {
-		return response.ErrorResponse(c, http.StatusBadRequest, "InputException", "`opt_expiry` is required")
-	}
-
-	// optExpiry should be a valid date, if provided
-	if len(optExpiry) > 0 {
-		_, err := time.Parse("2006-01-02", optExpiry)
-		if err != nil {
-			return response.ErrorResponse(c, http.StatusBadRequest, "InputException", "Invalid `opt_expiry` format")
-		}
-	}
-
-	// futExpiry should be a valid date, if provided
-	if len(futExpiry) > 0 {
-		_, err := time.Parse("2006-01-02", futExpiry)
-		if err != nil {
-			return response.ErrorResponse(c, http.StatusBadRequest, "InputException", "Invalid `fut_expiry` format")
-		}
-	}
-
-	instruments, err := h.InstrumentService.GetFNOOptionChain(exchange, name, futExpiry, optExpiry)
-	if err != nil {
-		return response.ErrorResponse(c, http.StatusInternalServerError, "ServerException", err.Error())
-	}
-
-	return response.SuccessResponse(c, instruments)
-}
-
 // GetFNOSegmentWiseName returns a list of segment wise name for a given expiry
 func (h *InstrumentHandler) GetFNOSegmentWiseName(c echo.Context) error {
 	expiry := c.Param("expiry")

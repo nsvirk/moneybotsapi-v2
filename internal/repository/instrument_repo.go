@@ -201,6 +201,7 @@ func (r *InstrumentRepository) GetFNOSegmentWiseName(expiry string) ([]models.In
 	err := r.DB.Model(&models.InstrumentModel{}).
 		Select("DISTINCT segment, name").
 		Where("expiry = ?", expiry).
+		Order("name ASC").
 		Find(&instruments).
 		Error
 	return instruments, err
@@ -218,29 +219,4 @@ func (r *InstrumentRepository) GetFNOSegmentWiseExpiry(name string, limit, offse
 		Find(&instruments).
 		Error
 	return instruments, err
-}
-
-// GetFNOOptionChain returns the option chain for a given instrument
-func (r *InstrumentRepository) GetFNOOptionChain(exchange, name, futExpiry, optExpiry string) ([]models.InstrumentModel, error) {
-	// get fut instruments
-	var futInstruments []models.InstrumentModel
-	if len(futExpiry) > 0 {
-		err := r.DB.Where("exchange = ? AND name = ? AND expiry = ? AND instrument_type = 'FUT' ORDER BY expiry ASC LIMIT 1", exchange, name, futExpiry).
-			Find(&futInstruments).
-			Error
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	// get opt instruments
-	var optInstruments []models.InstrumentModel
-	err := r.DB.Where("exchange = ? AND name = ? AND expiry = ? AND instrument_type IN ('CE', 'PE')", exchange, name, optExpiry).
-		Find(&optInstruments).
-		Error
-	if err != nil {
-		return nil, err
-	}
-
-	return append(futInstruments, optInstruments...), nil
 }

@@ -44,7 +44,6 @@ func SetupRoutes(e *echo.Echo, cfg *config.Config, db *gorm.DB, redisClient *red
 	// instrument fno routes
 	instrumentGroup.GET("/fno/segment_expiries/:name", instrumentHandler.GetFNOSegmentWiseExpiry)
 	instrumentGroup.GET("/fno/segment_names/:expiry", instrumentHandler.GetFNOSegmentWiseName)
-	instrumentGroup.GET("/fno/optionchain", instrumentHandler.GetFNOOptionChain)
 
 	// Indices routes (protected)
 	indexHandler := handlers.NewIndexHandler(db)

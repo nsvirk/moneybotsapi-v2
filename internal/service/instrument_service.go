@@ -195,8 +195,3 @@ func (s *InstrumentService) GetFNOSegmentWiseName(expiry string) ([]models.Instr
 func (s *InstrumentService) GetFNOSegmentWiseExpiry(name string, limit, offset int) ([]models.InstrumentModel, error) {
 	return s.repo.GetFNOSegmentWiseExpiry(name, limit, offset)
 }
-
-// GetFNOOptionChain returns the option chain for a given instrument
-func (s *InstrumentService) GetFNOOptionChain(exchange, name, futExpiry, optExpiry string) ([]models.InstrumentModel, error) {
-	return s.repo.GetFNOOptionChain(exchange, name, futExpiry, optExpiry)
-}
